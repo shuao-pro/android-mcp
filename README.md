@@ -9,6 +9,7 @@ Control an Android phone with natural language — through Claude Desktop, Cherr
 </p>
 
 <p align="center">
+  <a href="https://github.com/shuao-pro/android-mcp"><img src="https://img.shields.io/github/stars/shuao-pro/android-mcp?style=social" alt="Stars"></a>
   <a href="https://github.com/shuao-pro/android-mcp"><img src="https://img.shields.io/badge/GitHub-shuao--pro%2Fandroid--mcp-181717?logo=github" alt="GitHub"></a>
   <img src="https://img.shields.io/badge/python-3.10+-blue" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
@@ -18,30 +19,29 @@ Control an Android phone with natural language — through Claude Desktop, Cherr
 
 ---
 
-## Architecture
+## 🏗️ Architecture
 
-```
-┌──────────┐   MCP/stdio    ┌──────────────┐   HTTP/ADB    ┌─────────────────┐
-│  Claude  │◄──────────────►│  Python MCP   │◄────────────►│  Android Device  │
-│  Desktop │                │  Server       │   tcp:18080   │  (Shizuku App)  │
-│          │                │  + Web GUI    │               │  port 18080      │
-│ Kai 9000 │  MCP/HTTP      │               │               │                 │
-│  (phone) │◄──────────────►│  :9000        │               │                 │
-└──────────┘                └──────────────┘               └─────────────────┘
-     ▲                            ▲                              ▲
-     │  SSE + Streamable HTTP     │  Vision API                  │  UID 2000
-     │  :9000/sse (Claude)       │  (Claude/GPT-4o)            │  System-level
-     │  :9000/mcp (Kai 9000)     │  Element recognition         │  Shell/Input/
-     │                            │                              │  File access
-     ▼                            ▼                              ▼
-  Any MCP                    Screenshot + AI                 Shizuku elevated
-  Client                     → click_element()               permissions
+```mermaid
+flowchart LR
+    A["🤖 MCP Client<br/>Claude / Kai 9000 / Cherry"]
+    B["🐍 Python Server<br/>FastMCP + Web GUI :8080"]
+    C["📱 Android Device<br/>Shizuku App :18080"]
+
+    A <-->|"SSE / stdio / HTTP<br/>:9000"| B
+    B <-->|"JSON-RPC<br/>ADB tunnel"| C
+
+    B -.->|"Vision API"| D["🧠 AI Vision<br/>Claude / GPT-4o"]
+    C -.->|"UID 2000"| E["⚡ System APIs<br/>Shell / Input / Files"]
 ```
 
-> **Tip:** The MCP server can run on the phone itself (Termux / Kai 9000 Linux sandbox).
-> With `ANDROID_HOST=127.0.0.1`, no ADB forward is needed — full phone-only automation.
+| Layer | Role | Key Tech |
+|-------|------|----------|
+| 🤖 **MCP Client** | AI assistant connects via MCP | Claude Desktop, Kai 9000, Cherry Studio |
+| 🐍 **Python Server** | Tool registry, Web GUI, AI chat agent | FastMCP + FastAPI + WebSocket |
+| 📱 **Android App** | System-level execution on device | Shizuku (UID 2000), HTTP JSON-RPC |
 
-## Features
+> 💡 The server can run on the phone itself (Termux / Kai 9000). Set `ANDROID_HOST=127.0.0.1` — no ADB needed.
+## ✨ Features
 
 ### Device Control (29 MCP Tools)
 
@@ -95,10 +95,6 @@ Connect any MCP-compatible client to the server:
 | Streamable HTTP | `:9000/mcp` | Kai 9000, modern MCP clients |
 | **Combined** (default) | **both on `:9000`** | **SSE + Streamable HTTP simultaneously** |
 
----
-
-
----
 
 ## 🔗 Links
 
@@ -108,7 +104,7 @@ Connect any MCP-compatible client to the server:
 | **Issues** | [Report a bug / Request feature](https://github.com/shuao-pro/android-mcp/issues) |
 | **README 中文** | [README_zh.md](./README_zh.md) |
 
-## Quick Start
+## 🚀 Quick Start
 
 ### Prerequisites
 
@@ -192,7 +188,7 @@ Now chat with the AI to control your phone — "open settings", "take a screensh
 
 ---
 
-## Configuration
+## ⚙️ Configuration
 
 Edit `.env`:
 
@@ -219,7 +215,7 @@ VISION_API_BASE=                # only for custom provider
 
 ---
 
-## CLI Commands
+## 🖥️ CLI Commands
 
 ```bash
 # Start modes
@@ -236,7 +232,7 @@ python -m android_mcp.gateway stop          # Stop daemon
 python -m android_mcp.gateway forward       # Set up ADB port forward
 ```
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 android-mcp/
@@ -262,7 +258,7 @@ android-mcp/
 │       ├── chat_agent.py  # AI chat → tool execution
 │       ├── scrcpy_bridge.py # scrcpy + frame streaming
 │       └── static/        # HTML/CSS/JS frontend
-├── android-app/           # Android app (Kotlin, Shizuku)
+├── android/               # Android APK (Kotlin/Java, HTTP JSON-RPC)
 ├── scripts/setup.sh       # First-time setup
 ├── start.sh               # One-click start
 ├── start.bat              # Windows launcher
@@ -272,7 +268,7 @@ android-mcp/
 
 ---
 
-## Requirements
+## 📋 Requirements
 
 | Component | Requirement |
 |-----------|-------------|
@@ -286,6 +282,6 @@ android-mcp/
 
 ---
 
-## License
+## 📄 License
 
 MIT
