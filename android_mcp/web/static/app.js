@@ -1088,3 +1088,21 @@ setTimeout(() => {
 connectWS();
 setTimeout(checkScrcpyStatus, 1500);
 setInterval(refreshDeviceInfo, 15000);
+
+// ===== Header clock =====
+(function updateClock() {
+  const el = document.getElementById('headerClock');
+  if (el) {
+    const now = new Date();
+    el.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  setTimeout(updateClock, 30000);
+})();
+
+// ===== Mobile sidebar toggle =====
+function toggleSidebar() {
+  const lp = document.getElementById('left-panel');
+  const rp = document.getElementById('right-panel');
+  if (lp) lp.classList.toggle('mobile-open');
+  if (rp) rp.classList.remove('mobile-open');
+}
