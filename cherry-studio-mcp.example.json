@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "android-mcp": {
+      "type": "streamableHttp",
+      "url": "http://<YOUR_ANDROID_IP>:9000/mcp",
+      "description": "Android MCP Server — device automation via Shizuku"
+    }
+  }
+}

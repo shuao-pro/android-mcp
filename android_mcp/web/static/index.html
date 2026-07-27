@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Android MCP — AI Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css?v=2.0.3">
+</head>
+<body>
+
+<!-- ===== Header ===== -->
+<header>
+  <div class="brand">
+    <span class="status-dot" id="statusDot"></span>
+    <h1>Android MCP</h1>
+  </div>
+  <div class="status">
+    <span id="statusLabel">Disconnected</span>
+    <span style="color:var(--border)">|</span>
+    <span id="deviceModel">No device</span>
+    <span style="color:var(--border)" id="mcpSep" hidden>|</span>
+    <span id="mcpClients" hidden>0 MCP</span>
+
+    <!-- Menu Button -->
+    <div class="header-menu" id="headerMenu">
+      <button class="menu-trigger" onclick="toggleMenu(event)" title="Menu">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+      </button>
+      <div class="menu-dropdown" id="menuDropdown">
+        <div class="menu-section">
+          <div class="menu-label" data-i18n="language">Language</div>
+          <div class="menu-row">
+            <button class="menu-opt" id="menuLangZh" onclick="setLang('zh')">中文</button>
+            <button class="menu-opt" id="menuLangEn" onclick="setLang('en')">English</button>
+          </div>
+        </div>
+        <div class="menu-divider"></div>
+        <button class="menu-item" onclick="openSettings();closeMenu();">
+          <span class="menu-icon">⚙</span>
+          <span>Settings</span>
+        </button>
+        <button class="menu-item" onclick="openSetupWizard();closeMenu();">
+          <span class="menu-icon">🔌</span>
+          <span data-i18n="setupWizard">Setup</span>
+        </button>
+        <button class="menu-item" onclick="refreshDeviceInfo();refreshScreen();closeMenu();">
+          <span class="menu-icon">↻</span>
+          <span>Refresh Status</span>
+        </button>
+        <div class="menu-divider"></div>
+        <div class="menu-item menu-version">
+          <span>Android MCP v2.0</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ===== Left Panel ===== -->
+<div id="left-panel">
+  <div class="panel-section">
+    <h3 data-i18n="deviceInfo">Device Info</h3>
+    <div class="info-grid">
+      <div class="info-card"><div class="label" data-i18n="model">Model</div><div class="value" id="devModel">--</div></div>
+      <div class="info-card"><div class="label" data-i18n="android">Android</div><div class="value" id="devAndroid">--</div></div>
+      <div class="info-card"><div class="label" data-i18n="display">Display</div><div class="value" id="devDisplay">--</div></div>
+      <div class="info-card"><div class="label" data-i18n="battery">Battery</div><div class="value" id="devBattery">--</div></div>
+      <div class="info-card"><div class="label" data-i18n="app">App</div><div class="value" id="devApp">--</div></div>
+      <div class="info-card"><div class="label" data-i18n="shizuku">Shizuku</div><div class="value" id="devShizuku">--</div></div>
+    </div>
+  </div>
+
+  <div class="panel-section">
+    <h3 data-i18n="quickActions">Quick Actions</h3>
+    <div class="quick-grid">
+      <button class="quick-btn" onclick="quick('press_key',{key:'home'})"><span class="icon">🏠</span>Home</button>
+      <button class="quick-btn" onclick="quick('press_key',{key:'back'})"><span class="icon">⬅</span>Back</button>
+      <button class="quick-btn" onclick="quick('press_key',{key:'recent'})"><span class="icon">▢</span>Recent</button>
+      <button class="quick-btn" onclick="quick('press_key',{key:'power'})"><span class="icon">⏻</span>Power</button>
+      <button class="quick-btn" onclick="quick('press_key',{key:'volume_up'})"><span class="icon">🔊</span>Vol+</button>
+      <button class="quick-btn" onclick="quick('press_key',{key:'volume_down'})"><span class="icon">🔉</span>Vol-</button>
+      <button class="quick-btn" onclick="quick('press_key',{key:'enter'})"><span class="icon">↵</span>Enter</button>
+      <button class="quick-btn" onclick="quick('press_key',{key:'delete'})"><span class="icon">⌫</span>Delete</button>
+    </div>
+  </div>
+
+  <div class="panel-section" style="flex:1;display:flex;flex-direction:column;min-height:0">
+    <h3 data-i18n="shellTerminal">Shell Terminal</h3>
+    <div class="shell-input-row">
+      <input type="text" id="shellInput" data-i18n="shellPlaceholder" placeholder="shell command..." onkeydown="shellKey(event)">
+      <button class="btn accent" style="flex:0" onclick="runShell()" data-i18n="run">Run</button>
+    </div>
+    <div class="shell-output" id="shellOutput">Enter a command...</div>
+  </div>
+</div>
+
+<!-- ===== Center: AI Chat ===== -->
+<div id="center-panel">
+  <div id="chat-messages">
+    <div class="chat-welcome" id="chatWelcome">
+      <h2>🤖 AI Phone Assistant</h2>
+      <p>Control your Android device with natural language.<br>Type a message below to get started.</p>
+      <div class="examples">
+        <span class="example-chip" onclick="sendExample(this)">Take a screenshot</span>
+        <span class="example-chip" onclick="sendExample(this)">Open Settings app</span>
+        <span class="example-chip" onclick="sendExample(this)">Press the home button</span>
+        <span class="example-chip" onclick="sendExample(this)">Click the search icon</span>
+        <span class="example-chip" onclick="sendExample(this)">What's my battery level?</span>
+        <span class="example-chip" onclick="sendExample(this)">Read clipboard</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="chat-input-area">
+    <textarea id="chatInput" rows="1" data-i18n="chatPlaceholder" placeholder="Describe what you want to do on the phone..."
+              onkeydown="chatKey(event)"></textarea>
+    <button id="chat-send-btn" onclick="sendChat()" data-i18n="send">Send</button>
+  </div>
+</div>
+
+<!-- ===== Right Panel: Screenshot ===== -->
+<div id="right-panel">
+  <h3 data-i18n="liveScreen">Live Screen</h3>
+  <div class="screenshot-frame" id="screenshotFrame" onclick="onScreenshotClick(event)">
+    <span class="placeholder">Click Play to start</span>
+    <div class="stream-badge" id="streamBadge" style="display:none">
+      <span class="live-dot"></span> LIVE
+    </div>
+  </div>
+  <div class="btn-row">
+    <button class="btn accent" id="streamBtn" onclick="toggleScreenStream()">▶ Play</button>
+    <button class="btn" id="scrcpyBtn" onclick="toggleScrcpy()">📱 scrcpy</button>
+    <button class="btn" onclick="quick('screenshot',{})" data-i18n="save">Save</button>
+  </div>
+  <div class="scrcpy-status" id="scrcpyStatus"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- ===== Setup Wizard Modal ===== -->
+<div class="modal-overlay" id="setupModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2 data-i18n="setupTitle">Connection Setup Wizard</h2>
+      <button class="modal-close" onclick="closeSetupWizard()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-subtitle" data-i18n="setupSubtitle">Follow these steps to connect your Android device.</p>
+
+      <div class="wizard-steps">
+        <div class="wizard-step" id="step-adb">
+          <div class="step-icon"><span class="step-num">1</span></div>
+          <div class="step-content">
+            <div class="step-title" data-i18n="stepAdbTitle">Install ADB</div>
+            <div class="step-desc" data-i18n="stepAdbDesc">
+              Download <a href="https://developer.android.com/tools/releases/platform-tools" target="_blank">Android SDK Platform Tools</a>
+              and add to PATH.
+            </div>
+            <div class="step-detail" id="detail-adb"></div>
+          </div>
+          <div class="step-status" id="status-adb">—</div>
+        </div>
+
+        <div class="wizard-step" id="step-device">
+          <div class="step-icon"><span class="step-num">2</span></div>
+          <div class="step-content">
+            <div class="step-title" data-i18n="stepDeviceTitle">Connect Device</div>
+            <div class="step-desc" data-i18n="stepDeviceDesc">
+              Connect phone via USB with <b>USB Debugging</b> enabled, or use wireless ADB.
+            </div>
+            <div class="step-detail" id="detail-device"></div>
+          </div>
+          <div class="step-status" id="status-device">—</div>
+        </div>
+
+        <div class="wizard-step" id="step-android">
+          <div class="step-icon"><span class="step-num">3</span></div>
+          <div class="step-content">
+            <div class="step-title" data-i18n="stepAndroidTitle">Start Android MCP Service</div>
+            <div class="step-desc" data-i18n="stepAndroidDesc">
+              Start <b>Shizuku</b> → open <b>Android MCP</b> app → grant Shizuku permission → tap <b>Start</b>.
+              The app listens on port 18080 for device control commands.
+            </div>
+            <div class="step-detail" id="detail-android"></div>
+          </div>
+          <div class="step-status" id="status-android">—</div>
+        </div>
+
+        <div class="wizard-step" id="step-mcp">
+          <div class="step-icon"><span class="step-num">4</span></div>
+          <div class="step-content">
+            <div class="step-title" data-i18n="stepMcpTitle">MCP Server &amp; API Frontend</div>
+            <div class="step-desc" data-i18n="stepMcpDesc">
+              The MCP server (SSE + Streamable HTTP) runs on port <b id="mcpPortDisplay">9000</b>.
+              Connect <b>Kai 9000</b> (F-Droid) or any MCP client to the endpoints below, then chat to control the device.
+            </div>
+            <div class="step-detail" id="detail-mcp"></div>
+            <div class="server-address-box" id="serverAddressBox" style="display:none;margin-top:8px;padding:10px 12px;background:var(--bg-card);border:1px dashed var(--accent);border-radius:6px;font-family:monospace;font-size:13px;word-break:break-all"></div>
+          </div>
+          <div class="step-status" id="status-mcp">—</div>
+        </div>
+
+        <div class="wizard-step" id="step-env">
+          <div class="step-icon"><span class="step-num">5</span></div>
+          <div class="step-content">
+            <div class="step-title" data-i18n="stepEnvTitle">Configure Environment</div>
+            <div class="step-desc" data-i18n="stepEnvDesc">
+              Create <code>.env</code> file in the project root (copy from <code>.env.example</code>).
+              Default config works out of the box.
+            </div>
+            <div class="step-detail" id="detail-env"></div>
+          </div>
+          <div class="step-status" id="status-env">—</div>
+        </div>
+
+        <div class="wizard-step" id="step-vision">
+          <div class="step-icon"><span class="step-num">6</span></div>
+          <div class="step-content">
+            <div class="step-title"><span data-i18n="stepVisionTitle">AI Vision API</span> <span class="badge-opt" data-i18n="optional">Optional</span></div>
+            <div class="step-desc" data-i18n="stepVisionDesc">
+              Set <code>VISION_PROVIDER</code> and <code>VISION_API_KEY</code> in <code>.env</code>
+              to enable AI chat and screen element recognition.
+            </div>
+            <div class="step-detail" id="detail-vision"></div>
+          </div>
+          <div class="step-status" id="status-vision">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <div class="setup-summary" id="setupSummary"></div>
+      <div>
+        <button class="btn" onclick="checkAllSetup()" data-i18n="checkAll">Check All</button>
+        <button class="btn accent" onclick="closeSetupWizard()" data-i18n="done">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Settings Modal ===== -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>API Settings</h2>
+      <button class="modal-close" onclick="closeSettings()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <!-- ADB Device Connection -->
+      <div class="settings-section">
+        <h3 class="settings-section-title">Device Connection</h3>
+        <div class="adb-device-list" id="adbDeviceList">
+          <span class="text-muted">Loading...</span>
+        </div>
+        <div class="adb-connect-row">
+          <input type="text" id="adbHostInput" class="form-input" placeholder="192.168.1.100:5555" style="flex:1">
+          <button type="button" class="btn accent" onclick="adbConnect()" style="flex:0">Connect</button>
+        </div>
+        <div class="adb-quick-actions">
+          <button type="button" class="btn small" onclick="adbEnableTcpip()">Enable TCP/IP (USB)</button>
+          <button type="button" class="btn small" onclick="refreshAdbDevices()">Refresh</button>
+        </div>
+        <div class="form-status" id="adbStatus"></div>
+      </div>
+
+      <div class="settings-divider"></div>
+
+      <form id="settingsForm" onsubmit="saveSettings(event)">
+        <!-- Provider -->
+        <div class="form-group">
+          <label class="form-label">Vision Provider</label>
+          <div class="provider-tabs" id="providerTabs">
+            <button type="button" class="prov-tab" data-prov="anthropic" onclick="selectProvider('anthropic')">
+              <span class="prov-icon">🧠</span> Anthropic
+            </button>
+            <button type="button" class="prov-tab" data-prov="openai" onclick="selectProvider('openai')">
+              <span class="prov-icon">🤖</span> OpenAI
+            </button>
+            <button type="button" class="prov-tab" data-prov="custom" onclick="selectProvider('custom')">
+              <span class="prov-icon">🔧</span> Custom
+            </button>
+          </div>
+        </div>
+
+        <!-- API Key -->
+        <div class="form-group">
+          <label class="form-label">API Key</label>
+          <div class="input-wrapper">
+            <input type="password" id="setApiKey" class="form-input" placeholder="sk-...">
+            <button type="button" class="input-toggle" onclick="toggleApiKeyVisibility()" title="Show/Hide">👁</button>
+          </div>
+        </div>
+
+        <!-- Model Name -->
+        <div class="form-group">
+          <label class="form-label">Model Name <span class="form-hint">(leave blank for default)</span></label>
+          <input type="text" id="setModel" class="form-input" placeholder="e.g. claude-sonnet-5-20251001">
+        </div>
+
+        <!-- Custom API Base (shown only for custom provider) -->
+        <div class="form-group" id="customUrlGroup" style="display:none">
+          <label class="form-label">API Base URL</label>
+          <input type="text" id="setApiBase" class="form-input" placeholder="https://your-endpoint.com/v1">
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn accent" style="flex:1">Save Settings</button>
+        </div>
+      </form>
+      <div class="form-status" id="settingsStatus"></div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/app.js?v=2.0.3"></script>
+</body>
+</html>

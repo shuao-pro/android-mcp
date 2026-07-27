@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "android-mcp-server"
+version = "2.0.2"
+description = "MCP Server for Android device automation via Shizuku + ADB tunnel"
+requires-python = ">=3.10"
+authors = [
+    { name = "Developer", email = "dev@example.com" }
+]
+license = "MIT"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+[project.scripts]
+android-mcp = "android_mcp.gateway:main"
+
+[tool.uv]
+dependencies = [
+    "mcp>=1.8.1",
+    "httpx>=0.25.0",
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "python-dotenv>=1.0.0",
+    "Pillow>=10.0.0",
+]
+
+[tool.uv.scripts]
+start = "android-mcp start"
+
+[tool.setuptools.packages.find]
+exclude = ["screenshots*"]

@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+build/
+*.whl
+
+# Environment
+.env
+
+# Runtime
+screenshots/
+*.log
+*.pid
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Android / Gradle
+android-app/.gradle/
+android-app/build/
+android-app/app/build/
+android-app/local.properties
+*.apk
+*.aab
+
+# Gradle wrapper (keep the jar and script)
+!android-app/gradle/wrapper/gradle-wrapper.jar
+!android-app/gradle/wrapper/gradle-wrapper.properties
+
+# Local config files
+cherry-studio-mcp.json

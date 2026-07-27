@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.AndroidMCP" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#1565C0</item>
+        <item name="colorPrimaryVariant">#0D47A1</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorSecondary">#42A5F5</item>
+        <item name="colorSecondaryVariant">#1E88E5</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+        <item name="colorSurface">#1E1E1E</item>
+        <item name="android:colorBackground">#121212</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+    </style>
+</resources>

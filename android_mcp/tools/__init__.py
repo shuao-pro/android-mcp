@@ -1,0 +1,254 @@
+"""MCP tools package — organized by domain.
+
+Usage:
+    from android_mcp.tools import register_all_tools
+    mcp = FastMCP("server")
+    register_all_tools(mcp)
+"""
+
+from typing import Dict, Any
+
+from android_mcp.tools.device import (
+    tool_health_check,
+    tool_get_device_info,
+    tool_get_battery_info,
+    tool_take_screenshot,
+    tool_get_ui_hierarchy,
+)
+from android_mcp.tools.input import (
+    tool_click,
+    tool_long_click,
+    tool_swipe,
+    tool_drag,
+    tool_type_text,
+    tool_press_key,
+)
+from android_mcp.tools.apps import (
+    tool_open_app,
+    tool_close_app,
+    tool_clear_app_data,
+    tool_install_app,
+    tool_uninstall_app,
+    tool_get_current_app,
+    tool_list_installed_apps,
+)
+from android_mcp.tools.system import (
+    tool_shell,
+    tool_get_system_setting,
+    tool_put_system_setting,
+    tool_set_clipboard,
+    tool_get_clipboard,
+    tool_get_notifications,
+    tool_start_activity,
+)
+from android_mcp.tools.files import (
+    tool_read_file,
+    tool_write_file,
+)
+from android_mcp.tools.vision import (
+    tool_find_element,
+    tool_click_element,
+)
+
+__all__ = [
+    # device
+    "tool_health_check",
+    "tool_get_device_info",
+    "tool_get_battery_info",
+    "tool_take_screenshot",
+    "tool_get_ui_hierarchy",
+    # input
+    "tool_click",
+    "tool_long_click",
+    "tool_swipe",
+    "tool_drag",
+    "tool_type_text",
+    "tool_press_key",
+    # apps
+    "tool_open_app",
+    "tool_close_app",
+    "tool_clear_app_data",
+    "tool_install_app",
+    "tool_uninstall_app",
+    "tool_get_current_app",
+    "tool_list_installed_apps",
+    # system
+    "tool_shell",
+    "tool_get_system_setting",
+    "tool_put_system_setting",
+    "tool_set_clipboard",
+    "tool_get_clipboard",
+    "tool_get_notifications",
+    "tool_start_activity",
+    # files
+    "tool_read_file",
+    "tool_write_file",
+    # vision
+    "tool_find_element",
+    "tool_click_element",
+]
+
+
+def register_all_tools(mcp) -> None:
+    """Register all MCP tools on a FastMCP instance.
+
+    Args:
+        mcp: FastMCP server instance.
+    """
+
+    # -- device --
+    @mcp.tool()
+    async def health_check() -> Dict[str, Any]:
+        """Check Android device connection status and Shizuku running state."""
+        return await tool_health_check()
+
+    @mcp.tool()
+    async def get_device_info() -> Dict[str, Any]:
+        """Get detailed device info: model, Android version, screen resolution, current app, etc."""
+        return await tool_get_device_info()
+
+    @mcp.tool()
+    async def get_battery_info() -> Dict[str, Any]:
+        """Get battery info: level, charging status, temperature, etc."""
+        return await tool_get_battery_info()
+
+    @mcp.tool()
+    async def take_screenshot() -> Dict[str, Any]:
+        """Capture current screen as a base64-encoded PNG image."""
+        return await tool_take_screenshot()
+
+    @mcp.tool()
+    async def get_ui_hierarchy() -> Dict[str, Any]:
+        """Dump current screen UI hierarchy via uiautomator dump."""
+        return await tool_get_ui_hierarchy()
+
+    # -- input --
+    @mcp.tool()
+    async def click(x: int, y: int) -> Dict[str, Any]:
+        """Tap the screen at the given pixel coordinates."""
+        return await tool_click(x, y)
+
+    @mcp.tool()
+    async def long_click(x: int, y: int, duration: float = 1.0) -> Dict[str, Any]:
+        """Long-press the screen at the given pixel coordinates."""
+        return await tool_long_click(x, y, duration)
+
+    @mcp.tool()
+    async def swipe(
+        start_x: int, start_y: int, end_x: int, end_y: int, duration: float = 0.5
+    ) -> Dict[str, Any]:
+        """Perform a swipe gesture from (start_x,start_y) to (end_x,end_y)."""
+        return await tool_swipe(start_x, start_y, end_x, end_y, duration)
+
+    @mcp.tool()
+    async def drag(
+        start_x: int, start_y: int, end_x: int, end_y: int, duration: float = 0.5
+    ) -> Dict[str, Any]:
+        """Perform a drag gesture from (start_x,start_y) to (end_x,end_y)."""
+        return await tool_drag(start_x, start_y, end_x, end_y, duration)
+
+    @mcp.tool()
+    async def type_text(text: str, clear: bool = False) -> Dict[str, Any]:
+        """Type text into the currently focused input field."""
+        return await tool_type_text(text, clear)
+
+    @mcp.tool()
+    async def press_key(key: str) -> Dict[str, Any]:
+        """Press a device key (back, home, recent, power, volume_up, volume_down, enter, delete, space, tab, escape, menu, search)."""
+        return await tool_press_key(key)
+
+    # -- apps --
+    @mcp.tool()
+    async def open_app(package_name: str) -> Dict[str, Any]:
+        """Launch an app by its package name."""
+        return await tool_open_app(package_name)
+
+    @mcp.tool()
+    async def close_app(package_name: str) -> Dict[str, Any]:
+        """Force-stop an app via am force-stop."""
+        return await tool_close_app(package_name)
+
+    @mcp.tool()
+    async def clear_app_data(package_name: str) -> Dict[str, Any]:
+        """Clear all data for an app via pm clear."""
+        return await tool_clear_app_data(package_name)
+
+    @mcp.tool()
+    async def install_app(apk_path: str, silent: bool = True) -> Dict[str, Any]:
+        """Install an APK (supports silent install via Shizuku)."""
+        return await tool_install_app(apk_path, silent)
+
+    @mcp.tool()
+    async def uninstall_app(package_name: str) -> Dict[str, Any]:
+        """Uninstall an app by its package name."""
+        return await tool_uninstall_app(package_name)
+
+    @mcp.tool()
+    async def get_current_app() -> Dict[str, Any]:
+        """Get the package name of the currently foreground app."""
+        return await tool_get_current_app()
+
+    @mcp.tool()
+    async def list_installed_apps() -> Dict[str, Any]:
+        """List all installed apps (packages) on the device."""
+        return await tool_list_installed_apps()
+
+    # -- system --
+    @mcp.tool()
+    async def shell(command: str, timeout: float = 30.0) -> Dict[str, Any]:
+        """Execute a shell command with ADB/Shizuku privileges."""
+        return await tool_shell(command, timeout)
+
+    @mcp.tool()
+    async def get_system_setting(namespace: str, key: str) -> Dict[str, Any]:
+        """Read a system setting (namespace: system, global, secure)."""
+        return await tool_get_system_setting(namespace, key)
+
+    @mcp.tool()
+    async def put_system_setting(
+        namespace: str, key: str, value: str
+    ) -> Dict[str, Any]:
+        """Write a system setting (requires Shizuku elevated permissions)."""
+        return await tool_put_system_setting(namespace, key, value)
+
+    @mcp.tool()
+    async def set_clipboard(text: str) -> Dict[str, Any]:
+        """Set the device clipboard content."""
+        return await tool_set_clipboard(text)
+
+    @mcp.tool()
+    async def get_clipboard() -> Dict[str, Any]:
+        """Get the current device clipboard content."""
+        return await tool_get_clipboard()
+
+    @mcp.tool()
+    async def get_notifications() -> Dict[str, Any]:
+        """Get current notifications from the device notification bar."""
+        return await tool_get_notifications()
+
+    @mcp.tool()
+    async def start_activity(action: str, extra: str = "{}") -> Dict[str, Any]:
+        """Start an Activity via an Android Intent."""
+        return await tool_start_activity(action, extra)
+
+    # -- files --
+    @mcp.tool()
+    async def read_file(path: str) -> Dict[str, Any]:
+        """Read a file from the device (supports /data/data and other restricted directories)."""
+        return await tool_read_file(path)
+
+    @mcp.tool()
+    async def write_file(path: str, content: str) -> Dict[str, Any]:
+        """Write content to a file on the device (supports /data/data and other restricted directories)."""
+        return await tool_write_file(path, content)
+
+    # -- vision --
+    @mcp.tool()
+    async def find_element(description: str) -> Dict[str, Any]:
+        """Locate a UI element on screen via vision model — returns coordinates, does not click."""
+        return await tool_find_element(description)
+
+    @mcp.tool()
+    async def click_element(description: str) -> Dict[str, Any]:
+        """Find a UI element via vision model and click it — combines find + click in one step."""
+        return await tool_click_element(description)
