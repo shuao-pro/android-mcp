@@ -28,16 +28,16 @@ screenshots/
 Thumbs.db
 
 # Android / Gradle
-android-app/.gradle/
-android-app/build/
-android-app/app/build/
-android-app/local.properties
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
 *.apk
 *.aab
 
 # Gradle wrapper (keep the jar and script)
-!android-app/gradle/wrapper/gradle-wrapper.jar
-!android-app/gradle/wrapper/gradle-wrapper.properties
+!android/gradle/wrapper/gradle-wrapper.jar
+!android/gradle/wrapper/gradle-wrapper.properties
 
 # Local config files
 cherry-studio-mcp.json

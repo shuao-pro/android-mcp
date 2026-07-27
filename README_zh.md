@@ -18,28 +18,28 @@
 
 ---
 
-## 架构
+## 🏗️ 架构
 
-```
-┌──────────┐   MCP/stdio    ┌──────────────┐   HTTP/ADB    ┌─────────────────┐
-│  Claude  │◄──────────────►│  Python MCP   │◄────────────►│  Android 设备    │
-│  Desktop │                │  Server       │   tcp:18080   │  (Shizuku App)  │
-│          │                │  + Web GUI    │               │  port 18080      │
-│ Kai 9000 │  MCP/HTTP      │               │               │                 │
-│  (手机)  │◄──────────────►│  :9000        │               │                 │
-└──────────┘                └──────────────┘               └─────────────────┘
-     ▲                            ▲                              ▲
-     │  SSE + Streamable HTTP     │  视觉 API                    │  UID 2000
-     │  :9000/sse (Claude)       │  (Claude/GPT-4o)            │  系统级权限
-     │  :9000/mcp (Kai 9000)     │  屏幕元素识别                │  Shell/触控/
-     │                            │                              │  文件访问
-     ▼                            ▼                              ▼
-  MCP 客户端                 截图 + AI 分析                  Shizuku 提权
-```
+ + "`" + mermaid
+flowchart LR
+    A["🤖 MCP 客户端<br/>Claude / Kai 9000 / Cherry"]
+    B["🐍 Python 服务器<br/>FastMCP + Web GUI :8080"]
+    C["📱 Android 设备<br/>Shizuku App :18080"]
 
-> **提示：** MCP 服务器可直接在手机上运行（Termux / Kai 9000 Linux 沙箱）。
-> 设置 `ANDROID_HOST=127.0.0.1`，无需 ADB 转发 — 手机完全独立自动化。
+    A <-->|"SSE / stdio / HTTP<br/>:9000"| B
+    B <-->|"JSON-RPC<br/>ADB 隧道"| C
 
+    B -.->|"视觉 API"| D["🧠 AI 视觉<br/>Claude / GPT-4o"]
+    C -.->|"UID 2000"| E["⚡ 系统 API<br/>Shell / 触控 / 文件"]
+ + "`" + 
+
+| 层级 | 角色 | 关键技术 |
+|------|------|----------|
+| 🤖 **MCP 客户端** | AI 助手通过 MCP 连接 | Claude Desktop、Kai 9000、Cherry Studio |
+| 🐍 **Python 服务器** | 工具注册、Web GUI、AI 聊天代理 | FastMCP + FastAPI + WebSocket |
+| 📱 **Android 应用** | 设备端系统级执行 | Shizuku (UID 2000)、HTTP JSON-RPC |
+
+> 💡 服务器可直接在手机上运行（Termux / Kai 9000）。设置  + "ANDROID_HOST=127.0.0.1" +  — 无需 ADB。
 ## 功能特性
 
 ### 设备控制（29 个 MCP 工具）

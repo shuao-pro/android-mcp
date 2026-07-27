@@ -67,11 +67,11 @@ def print_startup_banner(mode: str) -> None:
             print(f"             http://{lan_ip}:{mcp_port}/sse  (LAN)")
             print(f"             http://{lan_ip}:{mcp_port}/mcp  (LAN)")
         if mcp_host == "127.0.0.1":
-            print("  âš? MCP_HOST=127.0.0.1 â€?phone/WiFi clients WON'T reach this!")
+            print("  ï¿½? MCP_HOST=127.0.0.1 ï¿½?phone/WiFi clients WON'T reach this!")
             print("     Set MCP_HOST=0.0.0.0 in .env to allow external connections.")
         print()
-        print("  Kai 9000 â†?use the /mcp endpoint")
-        print("  Claude Desktop â†?use the /sse endpoint")
+        print("  Kai 9000 ï¿½?use the /mcp endpoint")
+        print("  Claude Desktop ï¿½?use the /sse endpoint")
     if mode in ("mcp-http",):
         print(f"  MCP HTTP:  http://{mcp_host}:{mcp_port}/mcp")
     if mode in ("mcp", "all"):
@@ -93,7 +93,7 @@ def print_startup_banner(mode: str) -> None:
             print()
             print("  To fix:")
             print(f"  1. Start Shizuku on your phone")
-            print(f"  2. Open Android MCP app â†?tap Start")
+            print(f"  2. Open Android MCP app ï¿½?tap Start")
             print(f"  3. Run: adb forward tcp:{config.ANDROID_PORT} tcp:{config.ANDROID_PORT}")
     else:
         print()
@@ -132,7 +132,7 @@ def parse_args():
     parser.add_argument(
         "--mode",
         choices=["mcp", "mcp-sse", "mcp-http", "web", "all", "all-sse"],
-        default="all",
+        default="all-sse",
         help=(
             "Startup mode: mcp (stdio), mcp-sse (SSE + Streamable HTTP), "
             "mcp-http (Streamable HTTP only), web (GUI only), all (stdio+GUI), "
