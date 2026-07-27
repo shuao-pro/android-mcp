@@ -262,3 +262,4 @@ header .status-wrap { display: flex; align-items: center; gap: 10px; font-size: 
 .terminal-body code { color:var(--accent); background:rgba(88,166,255,.1); padding:1px 4px; border-radius:2px; font-family:var(--mono); font-size:11px; }
 .terminal-body .term-typing { animation:termBlink .8s step-end infinite; }
 @keyframes termBlink { 0%,100%{opacity:1} 50%{opacity:0} }
+.stream-fps { color: var(--green); font-variant-numeric: tabular-nums; margin-left: 2px; font-size: 9px; opacity: .8; }

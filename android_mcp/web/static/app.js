@@ -329,7 +329,23 @@ function startScreenStream() {
         img.onload = () => { lastScreenshotWidth = img.naturalWidth; lastScreenshotHeight = img.naturalHeight; };
       }
       const badge = document.getElementById('streamBadge');
-      if (badge) badge.style.display = 'flex';
+      if (badge) {
+        badge.style.display = 'flex';
+        // Update FPS display
+        const fpsEl = document.getElementById('streamFps');
+        if (fpsEl && msg.method) {
+          const now = Date.now();
+          if (!badge._lastFrame) badge._lastFrame = now;
+          if (!badge._frameCount) badge._frameCount = 0;
+          badge._frameCount++;
+          if (now - badge._lastFrame >= 1000) {
+            const fps = Math.round(badge._frameCount * 1000 / (now - badge._lastFrame));
+            fpsEl.textContent = fps + 'fps';
+            badge._frameCount = 0;
+            badge._lastFrame = now;
+          }
+        }
+      }
     } else if (msg.type === 'status' && msg.error === 'device_offline') {
       // Device not connected — stop streaming gracefully
       stopScreenStream();
