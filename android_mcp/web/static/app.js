@@ -653,9 +653,27 @@ function debounce(fn, delay) {
   };
 }
 
-// ========== Shell ==========
+// ========== Shell Terminal ==========
+let _shellHistory = [];
+let _shellHistIdx = -1;
+
 function shellKey(e) {
-  if (e.key === 'Enter') runShell();
+  if (e.key === 'Enter') { runShell(); return; }
+  if (e.key === 'ArrowUp') { e.preventDefault(); shellHistPrev(); return; }
+  if (e.key === 'ArrowDown') { e.preventDefault(); shellHistNext(); return; }
+}
+
+function shellHistPrev() {
+  if (_shellHistory.length === 0) return;
+  if (_shellHistIdx === -1) _shellHistIdx = _shellHistory.length - 1;
+  else if (_shellHistIdx > 0) _shellHistIdx--;
+  document.getElementById('shellInput').value = _shellHistory[_shellHistIdx] || '';
+}
+
+function shellHistNext() {
+  if (_shellHistIdx === -1) return;
+  if (_shellHistIdx < _shellHistory.length - 1) { _shellHistIdx++; document.getElementById('shellInput').value = _shellHistory[_shellHistIdx]; }
+  else { _shellHistIdx = -1; document.getElementById('shellInput').value = ''; }
 }
 
 function runShell() {
@@ -664,19 +682,47 @@ function runShell() {
   const cmd = input.value.trim();
   if (!cmd) return;
 
-  output.textContent = `$ ${cmd}\nRunning...`;
+  if (_shellHistory.length === 0 || _shellHistory[_shellHistory.length-1] !== cmd) {
+    _shellHistory.push(cmd);
+    if (_shellHistory.length > 50) _shellHistory.shift();
+  }
+  _shellHistIdx = -1;
   input.value = '';
+
+  appendTermLine('term-cmd', '<span class="term-prompt-text">$</span>' + escHtml(cmd));
+  appendTermLine('term-info', '...');
   sendWS('shell', { command: cmd });
 }
 
 function handleShellResult(result) {
+  // Remove the "..." line
   const output = document.getElementById('shellOutput');
-  if (result.success) {
-    const out = result.data?.output || '(no output)';
-    output.textContent = `$ ${result.data?.command || 'shell'}\n${out}`;
-  } else {
-    output.textContent = `[Error] ${result.error}`;
+  const lines = output.querySelectorAll('.term-line');
+  const last = lines[lines.length - 1];
+  if (last && last.classList.contains('term-info') && last.textContent === '...') {
+    last.remove();
   }
+
+  if (result.success) {
+    const out = (result.data?.output || result.stdout || '(no output)').trim();
+    if (out) {
+      out.split('\n').forEach(function(l) { appendTermLine('term-out', escHtml(l)); });
+    } else {
+      appendTermLine('term-info', '(empty)');
+    }
+  } else {
+    appendTermLine('term-err', '[Error] ' + escHtml(result.error || result.data?.error || 'unknown'));
+  }
+  output.scrollTop = output.scrollHeight;
+}
+
+function appendTermLine(cls, html) {
+  const output = document.getElementById('shellOutput');
+  const div = document.createElement('div');
+  div.className = 'term-line ' + cls;
+  div.innerHTML = html;
+  output.appendChild(div);
+  output.scrollTop = output.scrollHeight;
 }
 
 // ========== WebSocket Send ==========

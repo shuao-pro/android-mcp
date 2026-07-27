@@ -92,13 +92,24 @@
     </div>
   </div>
 
-  <div class="panel-section" style="flex:1;display:flex;flex-direction:column;min-height:0">
+  <div class="panel-section terminal-wrapper" style="flex:1;display:flex;flex-direction:column;min-height:0">
     <h3 data-i18n="shellTerminal">Shell Terminal</h3>
-    <div class="shell-input-row">
-      <input type="text" id="shellInput" data-i18n="shellPlaceholder" placeholder="shell command..." onkeydown="shellKey(event)">
-      <button class="btn accent" style="flex:0" onclick="runShell()" data-i18n="run">Run</button>
+    <div class="terminal">
+      <div class="terminal-header">
+        <span class="term-dot term-dot-red"></span>
+        <span class="term-dot term-dot-yellow"></span>
+        <span class="term-dot term-dot-green"></span>
+        <span class="terminal-title">adb shell</span>
+      </div>
+      <div class="terminal-body" id="shellOutput">
+        <div class="term-line term-welcome">Android MCP Shell v2.0 — type <code>help</code> for available commands</div>
+      </div>
+      <div class="terminal-input-row">
+        <span class="term-prompt">$</span>
+        <input type="text" id="shellInput" class="terminal-input" placeholder="ls -la /sdcard" onkeydown="shellKey(event)" autocomplete="off" spellcheck="false">
+        <button class="term-run-btn" onclick="runShell()" title="Run">&#9654;</button>
+      </div>
     </div>
-    <div class="shell-output" id="shellOutput">Enter a command...</div>
   </div>
 </div>
 
