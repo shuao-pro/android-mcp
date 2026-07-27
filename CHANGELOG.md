@@ -1,5 +1,28 @@
 # Development Log — Android MCP Server
 
+
+## v2.0.3 (2026-07-27)
+
+### Project Restructuring
+
+- **Unified repository** — merged Python server and Android APK into a single flat repo at root level.
+- **Android APK migrated** — old WebSocket-based `android-app/` (deprecated) replaced with new `android/` project using HTTP JSON-RPC + Shizuku. All 29 API methods aligned with Python `bridge.py`.
+- **Cleaned up** — removed deprecated ~11MB WebSocket APK project, duplicate APK binaries, nested `.git` directories.
+
+### Bug Fixes
+
+- **`bridge.get_screenshot()` format mismatch** — Android APK returns `image_base64` at top level; bridge now normalizes to `{data: {base64: ...}}` expected by tools layer. This was silently breaking screenshots and AI vision.
+- **Health endpoint compatibility** — `check_android_connectivity()` and `bridge.health_check()` now accept both JSON-RPC `{"result":"ok"}` and legacy `{"connected":true}` formats. Fixed always-offline startup banner.
+- **Vision screen dimensions** — `tool_find_element()` was reading `data.display_size` but APK returns `screen_resolution` at top level. Fixed to correct key.
+
+### Documentation
+
+- **Mermaid architecture diagram** — replaced broken ASCII art with interactive Mermaid flowchart.
+- **Language switcher** — `🇺🇸 English | 🇨🇳 中文` button at top of both READMEs.
+- **GitHub badges** — added Stars, GitHub repo link, Python, License, MCP, version badges.
+- **Full source tree** — project structure now shows complete `android/` APK source (all 11 Kotlin/Java files organized by package).
+- **Emoji section headers** — 🏗️ ✨ 🚀 ⚙️ 🖥️ 📁 📋 for visual scanning.
+- **Dual-language Links section** — cross-references between English and Chinese READMEs.
 ## v2.0.2 (2026-07-14)
 
 ### MCP Transport — Dual SSE + Streamable HTTP on One Port
