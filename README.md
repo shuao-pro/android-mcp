@@ -5,6 +5,11 @@
 Control an Android phone with natural language — through Claude Desktop, Cherry Studio, Kai 9000, or the built-in Web GUI with AI chat.
 
 <p align="center">
+  <b>🇺🇸 English</b> &nbsp;|&nbsp; <a href="./README_zh.md">🇨🇳 中文</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/shuao-pro/android-mcp"><img src="https://img.shields.io/badge/GitHub-shuao--pro%2Fandroid--mcp-181717?logo=github" alt="GitHub"></a>
   <img src="https://img.shields.io/badge/python-3.10+-blue" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
   <img src="https://img.shields.io/badge/MCP-1.8+-purple" alt="MCP">
@@ -92,6 +97,17 @@ Connect any MCP-compatible client to the server:
 
 ---
 
+
+---
+
+## 🔗 Links
+
+| Resource | URL |
+|----------|-----|
+| **GitHub** | [github.com/shuao-pro/android-mcp](https://github.com/shuao-pro/android-mcp) |
+| **Issues** | [Report a bug / Request feature](https://github.com/shuao-pro/android-mcp/issues) |
+| **README 中文** | [README_zh.md](./README_zh.md) |
+
 ## Quick Start
 
 ### Prerequisites
@@ -104,7 +120,7 @@ Connect any MCP-compatible client to the server:
 ### 1. Install
 
 ```bash
-git clone https://github.com/user/android-mcp.git
+git clone https://github.com/shuao-pro/android-mcp.git
 cd android-mcp
 pip install -e .
 ```

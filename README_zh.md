@@ -5,6 +5,11 @@
 通过 Claude Desktop、Cherry Studio、Kai 9000、或内置的 AI 对话 Web 界面，用自然语言操控你的 Android 手机。
 
 <p align="center">
+  <a href="./README.md">🇺🇸 English</a> &nbsp;|&nbsp; <b>🇨🇳 中文</b>
+</p>
+
+<p align="center">
+  <a href="https://github.com/shuao-pro/android-mcp"><img src="https://img.shields.io/badge/GitHub-shuao--pro%2Fandroid--mcp-181717?logo=github" alt="GitHub"></a>
   <img src="https://img.shields.io/badge/python-3.10+-blue" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
   <img src="https://img.shields.io/badge/MCP-1.8+-purple" alt="MCP">
@@ -91,6 +96,17 @@
 
 ---
 
+
+---
+
+## 🔗 链接
+
+| 资源 | URL |
+|------|-----|
+| **GitHub** | [github.com/shuao-pro/android-mcp](https://github.com/shuao-pro/android-mcp) |
+| **Issues** | [报告问题 / 请求功能](https://github.com/shuao-pro/android-mcp/issues) |
+| **README English** | [README.md](./README.md) |
+
 ## 快速开始
 
 ### 前置条件
@@ -103,7 +119,7 @@
 ### 1. 安装
 
 ```bash
-git clone https://github.com/user/android-mcp.git
+git clone https://github.com/shuao-pro/android-mcp.git
 cd android-mcp
 pip install -e .
 ```
