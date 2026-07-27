@@ -258,7 +258,27 @@ android-mcp/
 │       ├── chat_agent.py  # AI chat → tool execution
 │       ├── scrcpy_bridge.py # scrcpy + frame streaming
 │       └── static/        # HTML/CSS/JS frontend
-├── android/               # Android APK (Kotlin/Java, HTTP JSON-RPC)
+├── android/               # Android APK project
+│   ├── app/src/main/
+│   │   ├── java/com/example/androidmcp/
+│   │   │   ├── App.kt             # Application class
+│   │   │   ├── MainActivity.kt    # Main UI + Shizuku auth
+│   │   │   ├── McpService.kt      # Foreground service
+│   │   │   ├── api/
+│   │   │   │   ├── FileApi.kt     # File read/write/delete
+│   │   │   │   ├── InputApi.kt    # Touch, swipe, key events
+│   │   │   │   ├── PackageApi.kt  # App install/uninstall
+│   │   │   │   ├── ShellApi.kt    # Shell command execution
+│   │   │   │   └── SystemApi.kt   # Screenshot, clipboard, settings
+│   │   │   ├── server/
+│   │   │   │   ├── HttpServer.kt  # Embedded HTTP server (:18080)
+│   │   │   │   └── Router.kt      # JSON-RPC method dispatch
+│   │   │   └── util/
+│   │   │       └── ShizukuHelper.kt # Shizuku binder wrapper
+│   │   └── res/                   # Layout, drawable, strings
+│   ├── gradle/                    # Gradle wrapper
+│   ├── build.gradle.kts
+│   └── settings.gradle.kts
 ├── scripts/setup.sh       # First-time setup
 ├── start.sh               # One-click start
 ├── start.bat              # Windows launcher

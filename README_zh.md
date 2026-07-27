@@ -261,7 +261,27 @@ android-mcp/
 │       ├── chat_agent.py  # AI 对话 → 工具执行
 │       ├── scrcpy_bridge.py # scrcpy + 画面推流
 │       └── static/        # HTML/CSS/JS 前端
-├── android-app/           # Android 应用（Kotlin, Shizuku）
+├── android/               # Android APK 项目
+│   ├── app/src/main/
+│   │   ├── java/com/example/androidmcp/
+│   │   │   ├── App.kt             # Application 入口
+│   │   │   ├── MainActivity.kt    # 主界面 + Shizuku 授权
+│   │   │   ├── McpService.kt      # 前台服务
+│   │   │   ├── api/
+│   │   │   │   ├── FileApi.kt     # 文件读写/删除
+│   │   │   │   ├── InputApi.kt    # 触控、滑动、按键
+│   │   │   │   ├── PackageApi.kt  # 应用安装/卸载
+│   │   │   │   ├── ShellApi.kt    # Shell 命令执行
+│   │   │   │   └── SystemApi.kt   # 截图、剪贴板、系统设置
+│   │   │   ├── server/
+│   │   │   │   ├── HttpServer.kt  # 内嵌 HTTP 服务器 (:18080)
+│   │   │   │   └── Router.kt      # JSON-RPC 方法路由
+│   │   │   └── util/
+│   │   │       └── ShizukuHelper.kt # Shizuku binder 封装
+│   │   └── res/                   # 布局、图标、字符串资源
+│   ├── gradle/                    # Gradle 构建系统
+│   ├── build.gradle.kts
+│   └── settings.gradle.kts
 ├── scripts/setup.sh       # 首次配置脚本
 ├── start.sh               # 一键启动脚本
 ├── start.bat              # Windows 启动脚本
