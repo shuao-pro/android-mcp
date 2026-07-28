@@ -67,11 +67,11 @@ def print_startup_banner(mode: str) -> None:
             print(f"             http://{lan_ip}:{mcp_port}/sse  (LAN)")
             print(f"             http://{lan_ip}:{mcp_port}/mcp  (LAN)")
         if mcp_host == "127.0.0.1":
-            print("  �? MCP_HOST=127.0.0.1 �?phone/WiFi clients WON'T reach this!")
+            print("  [!] MCP_HOST=127.0.0.1 — phone/WiFi clients WON'T reach this!")
             print("     Set MCP_HOST=0.0.0.0 in .env to allow external connections.")
         print()
-        print("  Kai 9000 �?use the /mcp endpoint")
-        print("  Claude Desktop �?use the /sse endpoint")
+        print("  Kai 9000 → use the /mcp endpoint")
+        print("  Claude Desktop → use the /sse endpoint")
     if mode in ("mcp-http",):
         print(f"  MCP HTTP:  http://{mcp_host}:{mcp_port}/mcp")
     if mode in ("mcp", "all"):
@@ -93,7 +93,7 @@ def print_startup_banner(mode: str) -> None:
             print()
             print("  To fix:")
             print(f"  1. Start Shizuku on your phone")
-            print(f"  2. Open Android MCP app �?tap Start")
+            print(f"  2. Open Android MCP app → tap Start")
             print(f"  3. Run: adb forward tcp:{config.ANDROID_PORT} tcp:{config.ANDROID_PORT}")
     else:
         print()
