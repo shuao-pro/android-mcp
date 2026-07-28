@@ -31,6 +31,18 @@ function t(k){ return (T[lang]||T.en)[k]||k; }
   connectWS();
   updateClock(); setInterval(updateClock, 30000);
   refreshDeviceInfo();
+
+  // Auto-show setup wizard if device not connected (once per session)
+  if(!sessionStorage.getItem('setupShown')){
+    setTimeout(function(){
+      fetch('/api/status').then(function(r){ return r.json(); }).then(function(s){
+        if(!s.connected && !s.shizuku_running){
+          openSetup();
+          sessionStorage.setItem('setupShown', '1');
+        }
+      }).catch(function(){});
+    }, 3000);
+  }
 })();
 
 function updateClock(){
