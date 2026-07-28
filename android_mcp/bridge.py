@@ -191,32 +191,44 @@ async def click(x: int, y: int) -> dict[str, Any]:
     return await _send("input.tap", {"x": x, "y": y})
 
 
-async def long_click(x: int, y: int, duration: int = 1000) -> dict[str, Any]:
-    return await _send("input.long_press", {"x": x, "y": y, "duration": duration})
+async def long_click(x: int, y: int, duration: float = 1.0) -> dict[str, Any]:
+    # Convert seconds to milliseconds for Android device
+    if duration < 10:
+        duration = duration * 1000
+    return await _send("input.long_press", {"x": x, "y": y, "duration": int(duration)})
 
 
 async def swipe(
-    start_x: int, start_y: int, end_x: int, end_y: int, duration: int = 300
+    start_x: int, start_y: int, end_x: int, end_y: int, duration: float = 0.3
 ) -> dict[str, Any]:
+    # Convert seconds to milliseconds for Android device
+    if duration < 10:
+        duration = duration * 1000
     return await _send("input.swipe", {
         "x1": start_x, "y1": start_y,
         "x2": end_x, "y2": end_y,
-        "duration": duration,
+        "duration": int(duration),
     })
 
 
 async def drag(
     start_x: int, start_y: int, end_x: int, end_y: int,
-    duration: int = 500, steps: int = 10,
+    duration: float = 0.5, steps: int = 10,
 ) -> dict[str, Any]:
+    # Convert seconds to milliseconds for Android device
+    if duration < 10:
+        duration = duration * 1000
     return await _send("input.drag", {
         "x1": start_x, "y1": start_y,
         "x2": end_x, "y2": end_y,
-        "duration": duration, "steps": steps,
+        "duration": int(duration), "steps": steps,
     })
 
 
-async def type_text(text: str) -> dict[str, Any]:
+async def type_text(text: str, clear: bool = False) -> dict[str, Any]:
+    if clear:
+        # Select all + delete before typing new text
+        return await _send("input.text", {"text": text, "clear": True})
     return await _send("input.text", {"text": text})
 
 
@@ -243,9 +255,10 @@ async def clear_app_data(package_name: str) -> dict[str, Any]:
     return await _send("package.clear_data", {"package": package_name})
 
 
-async def install_app(apk_path: str, allow_downgrade: bool = False) -> dict[str, Any]:
+async def install_app(apk_path: str, silent: bool = True, allow_downgrade: bool = False) -> dict[str, Any]:
     return await _send("package.install", {
         "apk_path": apk_path,
+        "silent": silent,
         "allow_downgrade": allow_downgrade,
     })
 
