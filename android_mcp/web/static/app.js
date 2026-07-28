@@ -481,12 +481,12 @@ function applyI18n(){
   if(si) si.placeholder = t('shellPlaceholder');
   var ci = document.getElementById('chatInput');
   if(ci) ci.placeholder = t('chatPlaceholder');
-  var zb = document.getElementById('langBtnZh');
-  var eb = document.getElementById('langBtnEn');
-  if(zb) zb.classList.toggle('active', lang==='zh');
-  if(eb) eb.classList.toggle('active', lang==='en');
+  var zb = document.getElementById('langBtnZh'); var eb = document.getElementById('langBtnEn');
+  if(zb) zb.classList.toggle('active', lang==='zh'); if(eb) eb.classList.toggle('active', lang==='en');
+  var he = document.getElementById('hlEn'); var hz = document.getElementById('hlZh');
+  if(he) he.classList.toggle('active', lang==='en'); if(hz) hz.classList.toggle('active', lang==='zh');
 }
-function switchLang(l){ lang=l; localStorage.setItem('lang',l); applyI18n(); }
+function switchLang(l){ lang=l; localStorage.setItem('lang',l); applyI18n(); var he=document.getElementById('hlEn'); var hz=document.getElementById('hlZh'); if(he) he.classList.toggle('active',l==='en'); if(hz) hz.classList.toggle('active',l==='zh'); }
 function cls(id){ document.getElementById(id).classList.remove('show'); }
 
 // ===== Helpers =====
