@@ -6,21 +6,47 @@ var lang = localStorage.getItem('lang') || 'en';
 var currentProvider = 'anthropic';
 
 var I = {
-  en: { connected:'Connected',disconnected:'Disconnected',noDevice:'No device',mcpClient:'MCP',play:'Play',stop:'Stop',send:'Send',
-    settings:'Settings',setupWizard:'Setup Wizard',language:'Language',langDesc:'Interface display language',
-    deviceConn:'Device Connection',deviceDesc:'ADB tunnel to Android MCP app',aiVision:'AI Vision',
+  en: {
+    connected:'Connected',disconnected:'Disconnected',noDevice:'No device',
+    play:'Play',stop:'Stop',send:'Send',device:'Device',quickActions:'Quick Actions',
+    shell:'Shell',home:'Home',back:'Back',recent:'Recent',power:'Power',
+    volUp:'Vol+',volDown:'Vol-',enter:'Enter',delete:'Delete',
+    model:'Model',android:'Android',display:'Display',battery:'Battery',
+    app:'App',shizuku:'Shizuku',liveScreen:'Live Screen',scrcpy:'scrcpy',save:'Save',
+    aiAssistant:'AI Phone Assistant',aiSub:'Control your Android device with natural language.',
+    chips:['Take a screenshot','Open Settings','Press home','Battery level?','Click search','Read clipboard'],
+    chatPlaceholder:'Describe what to do...',
+    settings:'Settings',setupWizard:'Setup Wizard',language:'Language',
+    langDesc:'Interface display language',deviceConn:'Device Connection',
+    deviceDesc:'ADB tunnel to Android MCP app',aiVision:'AI Vision',
     visionDesc:'Enables AI chat and element recognition',serverConfig:'Server Configuration',
     serverDesc:'Changes require restart',webGui:'Web GUI',mcpServer:'MCP Server',
-    connect:'Connect',enableTcpip:'Enable TCP/IP',refresh:'Refresh',provider:'Provider',custom:'Custom',
-    saveSettings:'Save All Settings',shellPlaceholder:'shell command...',chatPlaceholder:'Describe what to do...'
+    connect:'Connect',enableTcpip:'Enable TCP/IP',refresh:'Refresh',
+    provider:'Provider',custom:'Custom',saveSettings:'Save All Settings',
+    setupTitle:'Setup Wizard',setupSub:'Follow these steps to connect your device.',
+    checkAll:'Check All',done:'Done',shellPlaceholder:'shell command...',
+    streamClick:'\u25b6 Click Play to start'
   },
-  zh: { connected:'\u5df2\u8fde\u63a5',disconnected:'\u672a\u8fde\u63a5',noDevice:'\u65e0\u8bbe\u5907',mcpClient:'MCP',play:'\u64ad\u653e',stop:'\u505c\u6b62',send:'\u53d1\u9001',
-    settings:'\u8bbe\u7f6e',setupWizard:'\u5f15\u5bfc',language:'\u8bed\u8a00',langDesc:'\u754c\u9762\u663e\u793a\u8bed\u8a00',
-    deviceConn:'\u8bbe\u5907\u8fde\u63a5',deviceDesc:'ADB \u8fde\u63a5 Android MCP \u5e94\u7528',aiVision:'AI \u89c6\u89c9',
+  zh: {
+    connected:'\u5df2\u8fde\u63a5',disconnected:'\u672a\u8fde\u63a5',noDevice:'\u65e0\u8bbe\u5907',
+    play:'\u64ad\u653e',stop:'\u505c\u6b62',send:'\u53d1\u9001',device:'\u8bbe\u5907',quickActions:'\u5feb\u6377\u64cd\u4f5c',
+    shell:'\u547d\u4ee4',home:'\u4e3b\u9875',back:'\u8fd4\u56de',recent:'\u8fd1\u671f',power:'\u7535\u6e90',
+    volUp:'\u97f3\u91cf+',volDown:'\u97f3\u91cf-',enter:'\u786e\u8ba4',delete:'\u5220\u9664',
+    model:'\u578b\u53f7',android:'\u5b89\u5353',display:'\u5206\u8fa8\u7387',battery:'\u7535\u6c60',
+    app:'\u5e94\u7528',shizuku:'Shizuku',liveScreen:'\u5b9e\u65f6\u753b\u9762',scrcpy:'\u6295\u5c4f',save:'\u4fdd\u5b58',
+    aiAssistant:'AI \u624b\u673a\u52a9\u624b',aiSub:'\u7528\u81ea\u7136\u8bed\u8a00\u63a7\u5236\u4f60\u7684 Android \u8bbe\u5907\u3002',
+    chips:['\u622a\u56fe','\u6253\u5f00\u8bbe\u7f6e','\u6309\u4e3b\u9875','\u7535\u6c60\u7535\u91cf?','\u70b9\u51fb\u641c\u7d22','\u8bfb\u53d6\u526a\u8d34\u677f'],
+    chatPlaceholder:'\u63cf\u8ff0\u4f60\u8981\u64cd\u4f5c\u7684\u5185\u5bb9...',
+    settings:'\u8bbe\u7f6e',setupWizard:'\u5f15\u5bfc',language:'\u8bed\u8a00',
+    langDesc:'\u754c\u9762\u663e\u793a\u8bed\u8a00',deviceConn:'\u8bbe\u5907\u8fde\u63a5',
+    deviceDesc:'\u901a\u8fc7 ADB \u8fde\u63a5 Android MCP \u5e94\u7528',aiVision:'AI \u89c6\u89c9',
     visionDesc:'\u542f\u7528 AI \u5bf9\u8bdd\u548c\u5143\u7d20\u8bc6\u522b',serverConfig:'\u670d\u52a1\u5668\u914d\u7f6e',
-    serverDesc:'\u4fee\u6539\u540e\u9700\u91cd\u542f',webGui:'Web \u754c\u9762',mcpServer:'MCP \u670d\u52a1\u5668',
-    connect:'\u8fde\u63a5',enableTcpip:'\u542f\u7528 TCP/IP',refresh:'\u5237\u65b0',provider:'\u63d0\u4f9b\u5546',custom:'\u81ea\u5b9a\u4e49',
-    saveSettings:'\u4fdd\u5b58\u5168\u90e8\u8bbe\u7f6e',shellPlaceholder:'shell \u547d\u4ee4...',chatPlaceholder:'\u63cf\u8ff0\u4f60\u8981\u64cd\u4f5c\u7684\u5185\u5bb9...'
+    serverDesc:'\u4fee\u6539\u540e\u9700\u91cd\u542f\u670d\u52a1\u5668',webGui:'Web \u754c\u9762',mcpServer:'MCP \u670d\u52a1\u5668',
+    connect:'\u8fde\u63a5',enableTcpip:'\u542f\u7528 TCP/IP',refresh:'\u5237\u65b0',
+    provider:'\u63d0\u4f9b\u5546',custom:'\u81ea\u5b9a\u4e49',saveSettings:'\u4fdd\u5b58\u5168\u90e8\u8bbe\u7f6e',
+    setupTitle:'\u8fde\u63a5\u5411\u5bfc',setupSub:'\u6309\u4ee5\u4e0b\u6b65\u9aa4\u8fde\u63a5 Android \u8bbe\u5907\u3002',
+    checkAll:'\u5168\u90e8\u68c0\u67e5',done:'\u5b8c\u6210',shellPlaceholder:'shell \u547d\u4ee4...',
+    streamClick:'\u25b6 \u70b9\u51fb\u64ad\u653e'
   }
 };
 var lang = localStorage.getItem('lang') || 'en';
@@ -196,10 +222,10 @@ function stopStream(){
 function updateStreamUI(){
   var btn = document.getElementById('streamBtn');
   if(screenStreaming){
-    btn.textContent = '\u25a0 Stop';
+    btn.innerHTML = '&#x25a0; ' + t('stop');
     btn.classList.add('btn-danger');
   } else {
-    btn.textContent = '\u25b6 Play';
+    btn.innerHTML = '&#x25b6; ' + t('play');
     btn.classList.remove('btn-danger');
   }
 }
@@ -473,18 +499,72 @@ function togglePanel(panel){
 
 
 function applyI18n(){
+  // data-i18n attrs
   document.querySelectorAll('[data-i18n]').forEach(function(el){
-    var k = el.getAttribute('data-i18n');
-    var v = t(k); if(v) el.textContent = v;
+    var k = el.getAttribute('data-i18n'); var v = t(k); if(v) el.textContent = v;
   });
-  var si = document.getElementById('shellInput');
-  if(si) si.placeholder = t('shellPlaceholder');
+  // Section labels
+  var labels = document.querySelectorAll('.section-label');
+  if(labels[0]) labels[0].textContent = t('device');
+  if(labels[1]) labels[1].textContent = t('quickActions');
+  if(labels[2]) labels[2].textContent = t('shell');
+  if(labels[3]) labels[3].textContent = t('liveScreen');
+  // Device card labels
+  var dc = document.querySelectorAll('.dc-label');
+  var dkeys = ['model','android','display','battery','app','shizuku'];
+  dc.forEach(function(el,i){ if(dkeys[i]) el.textContent = t(dkeys[i]); });
+  // Quick action button text
+  var qa = document.querySelectorAll('.qa-btn');
+  var qkeys = ['home','back','recent','power','volUp','volDown','enter','delete'];
+  qa.forEach(function(el,i){ if(qkeys[i]) el.childNodes[1].textContent = t(qkeys[i]); });
+  // Screen buttons
+  var sbtns = document.querySelector('#right-panel .btn');
+  if(sbtns) sbtns.childNodes[0].textContent = t('scrcpy');
+  var svbtn = document.querySelector('#right-panel .btn-sm');
+  if(svbtn) svbtn.childNodes[0].textContent = t('save');
+  // Welcome
+  var wt = document.querySelector('.welcome-title');
+  if(wt) wt.textContent = t('aiAssistant');
+  var ws = document.querySelector('.welcome-sub');
+  if(ws) ws.textContent = t('aiSub');
+  // Welcome chips
+  var chips = t('chips');
+  if(Array.isArray(chips)){
+    document.querySelectorAll('.chip').forEach(function(el,i){ if(chips[i]) el.textContent = chips[i]; });
+  }
+  // Chat
   var ci = document.getElementById('chatInput');
   if(ci) ci.placeholder = t('chatPlaceholder');
-  var zb = document.getElementById('langBtnZh'); var eb = document.getElementById('langBtnEn');
+  var cs = document.querySelector('.chat-send');
+  if(cs) cs.textContent = t('send');
+  // Shell placeholder
+  var si = document.getElementById('shellInput');
+  if(si) si.placeholder = t('shellPlaceholder');
+  // Screen placeholder
+  var sp = document.querySelector('.screen-placeholder');
+  if(sp) sp.innerHTML = t('streamClick');
+  // Stream button text
+  var sb = document.getElementById('streamBtn');
+  if(sb && !screenStreaming) sb.innerHTML = '&#9654; ' + t('play');
+  // Setup wizard
+  var st = document.querySelector('#setupModal h2');
+  if(st) st.textContent = t('setupTitle');
+  var ss = document.querySelector('#setupModal .text-muted');
+  if(ss) ss.textContent = t('setupSub');
+  var ca = document.querySelector('#setupModal .btn.btn-sm');
+  if(ca) ca.textContent = t('checkAll');
+  var dn = document.querySelector('#setupModal .btn-primary');
+  if(dn) dn.textContent = t('done');
+  // Settings modal title
+  var setH2 = document.querySelector('#settingsModal h2');
+  if(setH2) setH2.textContent = t('settings');
+  // Lang buttons
+  var zb = document.getElementById('langBtnZh'), eb = document.getElementById('langBtnEn');
   if(zb) zb.classList.toggle('active', lang==='zh'); if(eb) eb.classList.toggle('active', lang==='en');
-  var he = document.getElementById('hlEn'); var hz = document.getElementById('hlZh');
+  var he = document.getElementById('hlEn'), hz = document.getElementById('hlZh');
   if(he) he.classList.toggle('active', lang==='en'); if(hz) hz.classList.toggle('active', lang==='zh');
+
+  // Apply screen placeholders too
 }
 function switchLang(l){ lang=l; localStorage.setItem('lang',l); applyI18n(); var he=document.getElementById('hlEn'); var hz=document.getElementById('hlZh'); if(he) he.classList.toggle('active',l==='en'); if(hz) hz.classList.toggle('active',l==='zh'); }
 function cls(id){ document.getElementById(id).classList.remove('show'); }
