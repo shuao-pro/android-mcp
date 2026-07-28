@@ -148,29 +148,45 @@
 
 <!-- ===== SETTINGS ===== -->
 <div class="modal-overlay" id="settingsModal">
-<div class="modal" style="max-width:660px">
-<div class="modal-head"><h2>Settings</h2>
+<div class="modal" style="max-width:680px">
+<div class="modal-head"><h2 data-i18n="settings">Settings</h2>
   <div style="display:flex;align-items:center;gap:8px">
-    <button class="btn btn-sm" onclick="document.getElementById('settingsModal').classList.remove('show');openSetup()">Setup Wizard</button>
-    <button class="modal-close" onclick="closeSettings()">&times;</button>
+    <button class="btn btn-sm" onclick="cls('settingsModal');openSetup()" data-i18n="setupWizard">Setup Wizard</button>
+    <button class="modal-close" onclick="cls('settingsModal')">&times;</button>
   </div>
 </div>
-<div class="modal-body" style="display:flex;flex-direction:column;gap:20px;padding:20px 24px">
+<div class="modal-body" style="display:flex;flex-direction:column;gap:18px;padding:20px 24px">
+
+<!-- Language -->
+<div class="set-card">
+  <div class="set-card-head">
+    <span class="set-card-icon">??</span>
+    <div><div class="set-card-title" data-i18n="language">Language</div><div class="set-card-sub" data-i18n="langDesc">Interface display language</div></div>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="lang-btn" id="langBtnZh" onclick="switchLang('zh')">???? ??</button>
+    <button class="lang-btn" id="langBtnEn" onclick="switchLang('en')">???? English</button>
+  </div>
+</div>
 
 <!-- Device Connection -->
 <div class="set-card">
   <div class="set-card-head">
-    <span class="set-card-icon">&#128241;</span>
-    <div><div class="set-card-title">Device Connection</div><div class="set-card-sub">ADB devices and wireless pairing</div></div>
+    <span class="set-card-icon">??</span>
+    <div><div class="set-card-title" data-i18n="deviceConn">Device Connection</div><div class="set-card-sub" data-i18n="deviceDesc">ADB tunnel to Android MCP app</div></div>
   </div>
-  <div class="adb-device-list" id="adbDeviceList" style="margin-bottom:10px">Loading...</div>
+  <div class="form-row">
+    <div class="form-group" style="flex:1"><label class="form-label">Host</label><input class="form-input" id="setAndroidHost" placeholder="127.0.0.1"></div>
+    <div class="form-group" style="flex:1"><label class="form-label">Port</label><input class="form-input" id="setAndroidPort" placeholder="18080"></div>
+  </div>
+  <div class="adb-device-list" id="adbDeviceList" style="margin:0 0 10px">Loading ADB devices...</div>
   <div class="adb-connect-row">
     <input class="form-input" id="adbHostInput" placeholder="192.168.1.100:5555">
-    <button class="btn btn-primary btn-sm" onclick="adbConnect()">Connect</button>
+    <button class="btn btn-primary btn-sm" onclick="adbConnect()" data-i18n="connect">Connect</button>
   </div>
   <div class="adb-quick-actions">
-    <button class="btn btn-sm" onclick="adbEnableTcpip()">Enable TCP/IP (USB)</button>
-    <button class="btn btn-sm" onclick="refreshAdbDevices()">Refresh</button>
+    <button class="btn btn-sm" onclick="adbEnableTcpip()" data-i18n="enableTcpip">Enable TCP/IP</button>
+    <button class="btn btn-sm" onclick="refreshAdbDevices()" data-i18n="refresh">Refresh</button>
   </div>
   <div class="form-status" id="adbStatus"></div>
 </div>
@@ -178,56 +194,47 @@
 <!-- AI Vision -->
 <div class="set-card">
   <div class="set-card-head">
-    <span class="set-card-icon">&#129504;</span>
-    <div><div class="set-card-title">AI Vision</div><div class="set-card-sub">Enables AI chat and screen element recognition</div></div>
+    <span class="set-card-icon">??</span>
+    <div><div class="set-card-title" data-i18n="aiVision">AI Vision</div><div class="set-card-sub" data-i18n="visionDesc">Enables AI chat and screen element recognition</div></div>
   </div>
-
-  <div class="form-group" style="margin-top:4px">
-    <label class="form-label">Provider</label>
-    <div class="provider-tabs">
-      <button type="button" class="prov-tab" data-prov="anthropic" onclick="selectProvider('anthropic')"><span class="prov-icon">&#129504;</span>Anthropic</button>
-      <button type="button" class="prov-tab" data-prov="openai" onclick="selectProvider('openai')"><span class="prov-icon">&#129302;</span>OpenAI</button>
-      <button type="button" class="prov-tab" data-prov="custom" onclick="selectProvider('custom')"><span class="prov-icon">&#9881;</span>Custom</button>
-    </div>
-  </div>
-
   <div class="form-group">
-    <label class="form-label">API Key</label>
-    <div class="input-wrap">
-      <input class="form-input" type="password" id="setApiKey" placeholder="sk-...">
-      <button type="button" class="input-toggle" onclick="toggleApiKey()">&#128065;</button>
+    <label class="form-label" data-i18n="provider">Provider</label>
+    <div class="provider-tabs">
+      <button type="button" class="prov-tab" data-prov="anthropic" onclick="selectProvider('anthropic')"><span class="prov-icon">??</span>Anthropic</button>
+      <button type="button" class="prov-tab" data-prov="openai" onclick="selectProvider('openai')"><span class="prov-icon">??</span>OpenAI</button>
+      <button type="button" class="prov-tab" data-prov="custom" onclick="selectProvider('custom')"><span class="prov-icon">?</span><span data-i18n="custom">Custom</span></button>
     </div>
   </div>
-
-  <div class="form-row">
-    <div class="form-group" style="flex:1">
-      <label class="form-label">Model <span class="form-hint">(optional)</span></label>
-      <input class="form-input" id="setModel" placeholder="gpt-4o / claude-sonnet-5-20251001">
-    </div>
+  <div class="form-group"><label class="form-label">API Key</label>
+    <div class="input-wrap"><input class="form-input" type="password" id="setApiKey" placeholder="sk-..."><button type="button" class="input-toggle" onclick="toggleApiKey()">??</button></div>
   </div>
-
-  <div class="form-group" id="customUrlGroup" style="display:none">
-    <label class="form-label">API Base URL</label>
+  <div class="form-group"><label class="form-label">Model <span class="form-hint">(optional)</span></label>
+    <input class="form-input" id="setModel" placeholder="gpt-4o">
+  </div>
+  <div class="form-group" id="customUrlGroup" style="display:none"><label class="form-label">API Base URL</label>
     <input class="form-input" id="setApiBase" placeholder="https://your-endpoint.com/v1">
   </div>
-
-  <button type="button" class="btn btn-primary" style="width:100%;margin-top:4px" onclick="saveVisionSettings()">Save Vision Settings</button>
-  <div class="form-status" id="settingsStatus"></div>
 </div>
 
-<!-- About -->
+<!-- Server -->
 <div class="set-card">
   <div class="set-card-head">
-    <span class="set-card-icon">&#9889;</span>
-    <div><div class="set-card-title">Server Status</div><div class="set-card-sub">MCP transport and Web GUI endpoints</div></div>
+    <span class="set-card-icon">??</span>
+    <div><div class="set-card-title" data-i18n="serverConfig">Server Configuration</div><div class="set-card-sub" data-i18n="serverDesc">Changes require server restart</div></div>
   </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" id="serverStatusGrid">
-    <div class="info-pill"><span class="pill-label">Web GUI</span><span class="pill-value">:8080</span></div>
-    <div class="info-pill"><span class="pill-label">MCP SSE</span><span class="pill-value">:9000/sse</span></div>
-    <div class="info-pill"><span class="pill-label">MCP HTTP</span><span class="pill-value">:9000/mcp</span></div>
-    <div class="info-pill"><span class="pill-label">Android</span><span class="pill-value">:18080</span></div>
+  <div class="form-row">
+    <div class="form-group" style="flex:1"><label class="form-label" data-i18n="webGui">Web GUI</label><input class="form-input" id="setWebHost" placeholder="127.0.0.1"></div>
+    <div class="form-group" style="flex:0 0 100px"><label class="form-label">Port</label><input class="form-input" id="setWebPort" placeholder="8080"></div>
+  </div>
+  <div class="form-row">
+    <div class="form-group" style="flex:1"><label class="form-label" data-i18n="mcpServer">MCP Server</label><input class="form-input" id="setMcpHost" placeholder="0.0.0.0"></div>
+    <div class="form-group" style="flex:0 0 100px"><label class="form-label">Port</label><input class="form-input" id="setMcpPort" placeholder="9000"></div>
   </div>
 </div>
+
+<!-- Save All -->
+<button type="button" class="btn btn-primary" style="width:100%;padding:12px;font-size:14px" onclick="saveAllSettings()" data-i18n="saveSettings">Save All Settings</button>
+<div class="form-status" id="settingsStatus"></div>
 
 </div></div></div><script src="/static/app.js?v=3.0"></script>
 </body>

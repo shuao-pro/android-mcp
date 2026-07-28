@@ -238,7 +238,7 @@ def _write_env_updates(updates: dict):
 
 @app.get("/api/settings")
 async def api_get_settings():
-    """Read vision API settings from .env."""
+    """Read all settings from .env."""
     env_data = _read_env_file()
     return {
         "success": True,
@@ -247,39 +247,45 @@ async def api_get_settings():
             "vision_api_key": env_data.get("VISION_API_KEY", ""),
             "vision_api_base": env_data.get("VISION_API_BASE", ""),
             "vision_model": env_data.get("VISION_MODEL", ""),
+            "android_host": env_data.get("ANDROID_HOST", "127.0.0.1"),
+            "android_port": env_data.get("ANDROID_PORT", "18080"),
+            "mcp_host": env_data.get("MCP_HOST", "0.0.0.0"),
+            "mcp_port": env_data.get("MCP_PORT", "9000"),
+            "web_host": env_data.get("WEB_HOST", "127.0.0.1"),
+            "web_port": env_data.get("WEB_PORT", "8080"),
         },
     }
 
 
 @app.post("/api/settings")
 async def api_save_settings(data: dict):
-    """Save vision API settings to .env file."""
+    """Save settings to .env file."""
     body = data or {}
     updates = {}
 
-    provider = body.get("vision_provider", "").strip()
-    api_key = body.get("vision_api_key", "").strip()
-    api_base = body.get("vision_api_base", "").strip()
-    model = body.get("vision_model", "").strip()
+    # Vision
+    for key, env_key in [
+        ("vision_provider", "VISION_PROVIDER"),
+        ("vision_api_key", "VISION_API_KEY"),
+        ("vision_api_base", "VISION_API_BASE"),
+        ("vision_model", "VISION_MODEL"),
+        ("android_host", "ANDROID_HOST"),
+        ("android_port", "ANDROID_PORT"),
+        ("mcp_host", "MCP_HOST"),
+        ("mcp_port", "MCP_PORT"),
+        ("web_host", "WEB_HOST"),
+        ("web_port", "WEB_PORT"),
+    ]:
+        val = body.get(key, "").strip()
+        if val:
+            updates[env_key] = val
 
-    if provider:
-        updates["VISION_PROVIDER"] = provider
-    if api_key:
-        updates["VISION_API_KEY"] = api_key
-    if api_base:
-        updates["VISION_API_BASE"] = api_base
-    if model:
-        updates["VISION_MODEL"] = model
+    if not updates:
+        return {"success": False, "error": "No settings provided"}
 
     try:
-        _write_env_updates(updates)
-        # Reload config so changes take effect immediately
-        import os as _os
-        config.VISION_PROVIDER = updates.get("VISION_PROVIDER", config.VISION_PROVIDER)
-        config.VISION_API_KEY = updates.get("VISION_API_KEY", config.VISION_API_KEY)
-        config.VISION_API_BASE = updates.get("VISION_API_BASE", config.VISION_API_BASE)
-        config.VISION_MODEL = updates.get("VISION_MODEL", config.VISION_MODEL)
-        return {"success": True, "data": {"saved": list(updates.keys())}}
+        _write_env_file(updates)
+        return {"success": True, "data": updates}
     except Exception as e:
         return {"success": False, "error": str(e)}
 

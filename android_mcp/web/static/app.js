@@ -5,13 +5,29 @@ var chatHistory = [], shellHist = [], shellHistIdx = -1;
 var lang = localStorage.getItem('lang') || 'en';
 var currentProvider = 'anthropic';
 
-var T = {
-  en: { connected:'Connected', disconnected:'Disconnected', noDevice:'No device', play:'\u25b6 Play', stop:'\u25a0 Stop', send:'Send' },
-  zh: { connected:'\u5df2\u8fde\u63a5', disconnected:'\u672a\u8fde\u63a5', noDevice:'\u65e0\u8bbe\u5907', play:'\u25b6 \u64ad\u653e', stop:'\u25a0 \u505c\u6b62', send:'\u53d1\u9001' }
+var I = {
+  en: { connected:'Connected',disconnected:'Disconnected',noDevice:'No device',mcpClient:'MCP',play:'Play',stop:'Stop',send:'Send',
+    settings:'Settings',setupWizard:'Setup Wizard',language:'Language',langDesc:'Interface display language',
+    deviceConn:'Device Connection',deviceDesc:'ADB tunnel to Android MCP app',aiVision:'AI Vision',
+    visionDesc:'Enables AI chat and element recognition',serverConfig:'Server Configuration',
+    serverDesc:'Changes require restart',webGui:'Web GUI',mcpServer:'MCP Server',
+    connect:'Connect',enableTcpip:'Enable TCP/IP',refresh:'Refresh',provider:'Provider',custom:'Custom',
+    saveSettings:'Save All Settings',shellPlaceholder:'shell command...',chatPlaceholder:'Describe what to do...'
+  },
+  zh: { connected:'\u5df2\u8fde\u63a5',disconnected:'\u672a\u8fde\u63a5',noDevice:'\u65e0\u8bbe\u5907',mcpClient:'MCP',play:'\u64ad\u653e',stop:'\u505c\u6b62',send:'\u53d1\u9001',
+    settings:'\u8bbe\u7f6e',setupWizard:'\u5f15\u5bfc',language:'\u8bed\u8a00',langDesc:'\u754c\u9762\u663e\u793a\u8bed\u8a00',
+    deviceConn:'\u8bbe\u5907\u8fde\u63a5',deviceDesc:'ADB \u8fde\u63a5 Android MCP \u5e94\u7528',aiVision:'AI \u89c6\u89c9',
+    visionDesc:'\u542f\u7528 AI \u5bf9\u8bdd\u548c\u5143\u7d20\u8bc6\u522b',serverConfig:'\u670d\u52a1\u5668\u914d\u7f6e',
+    serverDesc:'\u4fee\u6539\u540e\u9700\u91cd\u542f',webGui:'Web \u754c\u9762',mcpServer:'MCP \u670d\u52a1\u5668',
+    connect:'\u8fde\u63a5',enableTcpip:'\u542f\u7528 TCP/IP',refresh:'\u5237\u65b0',provider:'\u63d0\u4f9b\u5546',custom:'\u81ea\u5b9a\u4e49',
+    saveSettings:'\u4fdd\u5b58\u5168\u90e8\u8bbe\u7f6e',shellPlaceholder:'shell \u547d\u4ee4...',chatPlaceholder:'\u63cf\u8ff0\u4f60\u8981\u64cd\u4f5c\u7684\u5185\u5bb9...'
+  }
 };
+var lang = localStorage.getItem('lang') || 'en';
 function t(k){ return (T[lang]||T.en)[k]||k; }
 
 (function init(){
+  applyI18n();
   connectWS();
   updateClock(); setInterval(updateClock, 30000);
   refreshDeviceInfo();
@@ -363,28 +379,37 @@ function loadSettings(){
     if(d.vision_api_key) document.getElementById('setApiKey').value = d.vision_api_key;
     if(d.vision_model) document.getElementById('setModel').value = d.vision_model;
     if(d.vision_api_base) document.getElementById('setApiBase').value = d.vision_api_base;
+    if(d.android_host) document.getElementById('setAndroidHost').value = d.android_host;
+    if(d.android_port) document.getElementById('setAndroidPort').value = d.android_port;
+    if(d.mcp_host) document.getElementById('setMcpHost').value = d.mcp_host;
+    if(d.mcp_port) document.getElementById('setMcpPort').value = d.mcp_port;
+    if(d.web_host) document.getElementById('setWebHost').value = d.web_host;
+    if(d.web_port) document.getElementById('setWebPort').value = d.web_port;
   }).catch(function(){});
 }
-function saveVisionSettings(e){
+function saveAllSettings(e){
   if(e) e.preventDefault();
   var data = {
     vision_provider: currentProvider,
     vision_api_key: document.getElementById('setApiKey').value,
     vision_model: document.getElementById('setModel').value,
-    vision_api_base: currentProvider === 'custom' ? document.getElementById('setApiBase').value : ''
+    vision_api_base: currentProvider==='custom' ? document.getElementById('setApiBase').value : '',
+    android_host: document.getElementById('setAndroidHost').value,
+    android_port: document.getElementById('setAndroidPort').value,
+    mcp_host: document.getElementById('setMcpHost').value,
+    mcp_port: document.getElementById('setMcpPort').value,
+    web_host: document.getElementById('setWebHost').value,
+    web_port: document.getElementById('setWebPort').value
   };
+  var st = document.getElementById('settingsStatus');
+  st.textContent = 'Saving...'; st.className = 'form-status';
   fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
     .then(function(r){ return r.json(); }).then(function(r){
-      var st = document.getElementById('settingsStatus');
-      st.textContent = r.success ? 'Saved' : ('Error: '+(r.error||''));
+      st.textContent = r.success ? '✅ ' + t('saveSettings') + ' OK — restart server to apply' : ('Error: '+(r.error||''));
       st.className = 'form-status ' + (r.success ? 'success' : 'error');
     }).catch(function(e){
-      var st = document.getElementById('settingsStatus');
       st.textContent = 'Error: '+e.message; st.className = 'form-status error';
     });
-}
-function toggleApiKey(){
-  var el = document.getElementById('setApiKey'); el.type = el.type === 'password' ? 'text' : 'password';
 }
 
 // ===== ADB =====
@@ -422,6 +447,24 @@ function togglePanel(panel){
   var el = document.getElementById(panel==='left'?'left-panel':'right-panel');
   if(el) el.classList.toggle('mobile-open');
 }
+
+
+function applyI18n(){
+  document.querySelectorAll('[data-i18n]').forEach(function(el){
+    var k = el.getAttribute('data-i18n');
+    var v = t(k); if(v) el.textContent = v;
+  });
+  var si = document.getElementById('shellInput');
+  if(si) si.placeholder = t('shellPlaceholder');
+  var ci = document.getElementById('chatInput');
+  if(ci) ci.placeholder = t('chatPlaceholder');
+  var zb = document.getElementById('langBtnZh');
+  var eb = document.getElementById('langBtnEn');
+  if(zb) zb.classList.toggle('active', lang==='zh');
+  if(eb) eb.classList.toggle('active', lang==='en');
+}
+function switchLang(l){ lang=l; localStorage.setItem('lang',l); applyI18n(); }
+function cls(id){ document.getElementById(id).classList.remove('show'); }
 
 // ===== Helpers =====
 function escHtml(s){

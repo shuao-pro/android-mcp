@@ -233,3 +233,4 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
 .form-row{display:flex;gap:12px}
 .info-pill{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-xs);font-size:12px}
 .pill-label{color:var(--text-muted)}.pill-value{font-family:var(--mono);font-size:11px;color:var(--accent)}
+.lang-btn{flex:1;padding:8px 12px;background:var(--bg-card);border:2px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-size:13px;font-family:var(--font);color:var(--text-secondary);transition:all .15s var(--ease)}.lang-btn:hover{border-color:var(--accent);color:var(--text)}.lang-btn.active{border-color:var(--accent);background:var(--accent-glow);color:var(--accent);font-weight:600}
