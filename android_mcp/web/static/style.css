@@ -189,11 +189,21 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
 .form-input::placeholder{color:var(--text-muted)}
 .form-status{margin-top:10px;font-size:12px;text-align:center;min-height:18px}
 .form-status.success{color:var(--success)}.form-status.error{color:var(--danger)}
-.provider-tabs{display:flex;gap:6px}
-.prov-tab{flex:1;padding:10px 8px;text-align:center;cursor:pointer;background:var(--bg);border:2px solid var(--border);border-radius:var(--radius-sm);font-size:12px;font-family:var(--font);color:var(--text-secondary);transition:all .15s var(--ease)}
-.prov-tab:hover{border-color:var(--accent);color:var(--text)}
-.prov-tab.active{border-color:var(--accent);background:var(--accent-glow);color:var(--accent);font-weight:600}
-.prov-icon{display:block;font-size:20px;margin-bottom:2px}
+.provider-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.prov-card{display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 8px;background:var(--bg-card);border:2px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:all .2s var(--ease);font-family:var(--font);position:relative;overflow:hidden}
+.prov-card:hover{border-color:var(--accent);background:var(--bg-card-hover);transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.3)}
+.prov-card.active{border-color:var(--accent);background:rgba(59,130,246,.1);box-shadow:0 0 0 3px var(--accent-glow)}
+.prov-card-icon{font-size:28px;line-height:1}
+.prov-card-name{font-size:12px;font-weight:700;color:var(--text)}
+.prov-card-model{font-size:10px;color:var(--text-muted)}
+.prov-card-badge{position:absolute;top:4px;right:4px;font-size:8px;font-weight:700;background:var(--accent);color:#fff;padding:1px 5px;border-radius:8px;display:none}
+.prov-card.active .prov-card-badge{display:block}
+@media(max-width:600px){.provider-grid{grid-template-columns:repeat(3,1fr)}}
+
+/* .prov-tab removed, use .prov-card */
+
+
+/* .prov-icon superseded */
 .input-wrap{position:relative}.input-wrap .form-input{padding-right:36px}
 .input-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;padding:4px;opacity:.5}
 .input-toggle:hover{opacity:1}

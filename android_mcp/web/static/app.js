@@ -369,8 +369,19 @@ function openSettings(){ document.getElementById('settingsModal').classList.add(
 function closeSettings(){ document.getElementById('settingsModal').classList.remove('show'); }
 function selectProvider(p){
   currentProvider = p;
-  document.querySelectorAll('.prov-tab').forEach(function(t){ t.classList.toggle('active', t.dataset.prov === p); });
-  document.getElementById('customUrlGroup').style.display = p === 'custom' ? 'block' : 'none';
+  document.querySelectorAll('.prov-card').forEach(function(t){ t.classList.toggle('active', t.dataset.prov === p); });
+  document.getElementById('customUrlGroup').style.display = (p === 'custom' || p === 'deepseek' || p === 'gemini') ? 'block' : 'none';
+  var modelEl = document.getElementById('setModel');
+  var baseEl = document.getElementById('setApiBase');
+  var hint = document.getElementById('modelHint');
+  var defaults = {anthropic:'claude-sonnet-5-20251001',openai:'gpt-4o',deepseek:'deepseek-chat',gemini:'gemini-2.5-pro-exp-03-25',custom:''};
+  var bases = {anthropic:'https://api.anthropic.com',openai:'https://api.openai.com/v1',deepseek:'https://api.deepseek.com',gemini:'https://generativelanguage.googleapis.com/v1beta/openai',custom:''};
+  if(defaults[p] && (!modelEl.value || modelEl.dataset.auto === '1')){
+    modelEl.value = defaults[p]; modelEl.dataset.auto = '1';
+  }
+  if(bases[p]){ baseEl.value = bases[p]; baseEl.dataset.auto = '1'; }
+  else { baseEl.value = ''; baseEl.dataset.auto = ''; }
+  if(hint){ hint.textContent = p === 'custom' ? ' ? enter your model name' : ' ? auto-filled'; }
 }
 function loadSettings(){
   fetch('/api/settings').then(function(r){ return r.json(); }).then(function(r){

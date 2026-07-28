@@ -194,28 +194,63 @@
 <!-- AI Vision -->
 <div class="set-card">
   <div class="set-card-head">
-    <span class="set-card-icon">??</span>
+    <span class="set-card-icon">&#129504;</span>
     <div><div class="set-card-title" data-i18n="aiVision">AI Vision</div><div class="set-card-sub" data-i18n="visionDesc">Enables AI chat and screen element recognition</div></div>
   </div>
-  <div class="form-group">
+
+  <div class="form-group" style="margin-bottom:12px">
     <label class="form-label" data-i18n="provider">Provider</label>
-    <div class="provider-tabs">
-      <button type="button" class="prov-tab" data-prov="anthropic" onclick="selectProvider('anthropic')"><span class="prov-icon">??</span>Anthropic</button>
-      <button type="button" class="prov-tab" data-prov="openai" onclick="selectProvider('openai')"><span class="prov-icon">??</span>OpenAI</button>
-      <button type="button" class="prov-tab" data-prov="custom" onclick="selectProvider('custom')"><span class="prov-icon">?</span><span data-i18n="custom">Custom</span></button>
+    <div class="provider-grid">
+      <button type="button" class="prov-card" data-prov="anthropic" onclick="selectProvider('anthropic')">
+        <span class="prov-card-icon">&#129504;</span>
+        <span class="prov-card-name">Anthropic</span>
+        <span class="prov-card-model">Claude Sonnet</span>
+        <span class="prov-card-badge">Recommended</span>
+      </button>
+      <button type="button" class="prov-card" data-prov="openai" onclick="selectProvider('openai')">
+        <span class="prov-card-icon">&#129302;</span>
+        <span class="prov-card-name">OpenAI</span>
+        <span class="prov-card-model">GPT-4o</span>
+      </button>
+      <button type="button" class="prov-card" data-prov="deepseek" onclick="selectProvider('deepseek')">
+        <span class="prov-card-icon">&#128640;</span>
+        <span class="prov-card-name">DeepSeek</span>
+        <span class="prov-card-model">DeepSeek-V3</span>
+      </button>
+      <button type="button" class="prov-card" data-prov="gemini" onclick="selectProvider('gemini')">
+        <span class="prov-card-icon">&#129680;</span>
+        <span class="prov-card-name">Gemini</span>
+        <span class="prov-card-model">Gemini 2.5 Pro</span>
+      </button>
+      <button type="button" class="prov-card" data-prov="custom" onclick="selectProvider('custom')">
+        <span class="prov-card-icon">&#9881;</span>
+        <span class="prov-card-name" data-i18n="custom">Custom</span>
+        <span class="prov-card-model">OpenAI-compatible</span>
+      </button>
     </div>
   </div>
-  <div class="form-group"><label class="form-label">API Key</label>
-    <div class="input-wrap"><input class="form-input" type="password" id="setApiKey" placeholder="sk-..."><button type="button" class="input-toggle" onclick="toggleApiKey()">??</button></div>
-  </div>
-  <div class="form-group"><label class="form-label">Model <span class="form-hint">(optional)</span></label>
-    <input class="form-input" id="setModel" placeholder="gpt-4o">
-  </div>
-  <div class="form-group" id="customUrlGroup" style="display:none"><label class="form-label">API Base URL</label>
+
+  <div class="form-group" id="customUrlGroup" style="display:none">
+    <label class="form-label">API Base URL</label>
     <input class="form-input" id="setApiBase" placeholder="https://your-endpoint.com/v1">
+  </div>
+
+  <div class="form-row">
+    <div class="form-group" style="flex:1">
+      <label class="form-label">API Key</label>
+      <div class="input-wrap">
+        <input class="form-input" type="password" id="setApiKey" placeholder="sk-...">
+        <button type="button" class="input-toggle" onclick="toggleApiKey()">&#128065;</button>
+      </div>
+    </div>
+    <div class="form-group" style="flex:2">
+      <label class="form-label">Model <span class="form-hint" id="modelHint">? auto-selected</span></label>
+      <input class="form-input" id="setModel" placeholder="claude-sonnet-5-20251001">
+    </div>
   </div>
 </div>
 
+<!-- Server -->
 <!-- Server -->
 <div class="set-card">
   <div class="set-card-head">
