@@ -358,24 +358,25 @@ function selectProvider(p){
 }
 function loadSettings(){
   fetch('/api/settings').then(function(r){ return r.json(); }).then(function(r){
-    if(r.provider){ currentProvider = r.provider; selectProvider(r.provider); }
-    if(r.api_key) document.getElementById('setApiKey').value = r.api_key;
-    if(r.model) document.getElementById('setModel').value = r.model;
-    if(r.api_base) document.getElementById('setApiBase').value = r.api_base;
+    var d = r.data || r;
+    if(d.vision_provider){ currentProvider = d.vision_provider; selectProvider(d.vision_provider); }
+    if(d.vision_api_key) document.getElementById('setApiKey').value = d.vision_api_key;
+    if(d.vision_model) document.getElementById('setModel').value = d.vision_model;
+    if(d.vision_api_base) document.getElementById('setApiBase').value = d.vision_api_base;
   }).catch(function(){});
 }
-function saveSettings(e){
-  e.preventDefault();
+function saveVisionSettings(e){
+  if(e) e.preventDefault();
   var data = {
-    provider: currentProvider,
-    api_key: document.getElementById('setApiKey').value,
-    model: document.getElementById('setModel').value,
-    api_base: document.getElementById('setApiBase').value
+    vision_provider: currentProvider,
+    vision_api_key: document.getElementById('setApiKey').value,
+    vision_model: document.getElementById('setModel').value,
+    vision_api_base: currentProvider === 'custom' ? document.getElementById('setApiBase').value : ''
   };
   fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
     .then(function(r){ return r.json(); }).then(function(r){
       var st = document.getElementById('settingsStatus');
-      st.textContent = r.success ? 'Saved' : ('Error: '+r.error);
+      st.textContent = r.success ? 'Saved' : ('Error: '+(r.error||''));
       st.className = 'form-status ' + (r.success ? 'success' : 'error');
     }).catch(function(e){
       var st = document.getElementById('settingsStatus');

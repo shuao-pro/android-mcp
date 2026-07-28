@@ -148,40 +148,87 @@
 
 <!-- ===== SETTINGS ===== -->
 <div class="modal-overlay" id="settingsModal">
-<div class="modal"><div class="modal-head"><h2>Settings</h2><button class="modal-close" onclick="closeSettings()">&times;</button></div>
-<div class="modal-body">
-<div class="settings-section">
-<div class="settings-section-title">Device Connection</div>
-<div class="adb-device-list" id="adbDeviceList">Loading...</div>
-<div class="adb-connect-row">
-<input class="form-input" id="adbHostInput" placeholder="192.168.1.100:5555">
-<button class="btn btn-primary btn-sm" onclick="adbConnect()">Connect</button>
+<div class="modal" style="max-width:660px">
+<div class="modal-head"><h2>Settings</h2>
+  <div style="display:flex;align-items:center;gap:8px">
+    <button class="btn btn-sm" onclick="document.getElementById('settingsModal').classList.remove('show');openSetup()">Setup Wizard</button>
+    <button class="modal-close" onclick="closeSettings()">&times;</button>
+  </div>
 </div>
-<div class="adb-quick-actions">
-<button class="btn btn-sm" onclick="adbEnableTcpip()">Enable TCP/IP</button>
-<button class="btn btn-sm" onclick="refreshAdbDevices()">Refresh</button>
-</div>
-<div class="form-status" id="adbStatus"></div>
-</div>
-<div class="settings-divider"></div>
-<form onsubmit="saveSettings(event)">
-<div class="form-group"><label class="form-label">Vision Provider</label>
-<div class="provider-tabs">
-<button type="button" class="prov-tab" data-prov="anthropic" onclick="selectProvider('anthropic')"><span class="prov-icon">??</span>Anthropic</button>
-<button type="button" class="prov-tab" data-prov="openai" onclick="selectProvider('openai')"><span class="prov-icon">??</span>OpenAI</button>
-<button type="button" class="prov-tab" data-prov="custom" onclick="selectProvider('custom')"><span class="prov-icon">??</span>Custom</button>
-</div></div>
-<div class="form-group"><label class="form-label">API Key</label>
-<div class="input-wrap"><input class="form-input" type="password" id="setApiKey" placeholder="sk-..."><button type="button" class="input-toggle" onclick="toggleApiKey()">??</button></div></div>
-<div class="form-group"><label class="form-label">Model <span class="form-hint">(optional)</span></label>
-<input class="form-input" id="setModel" placeholder="gpt-4o"></div>
-<div class="form-group" id="customUrlGroup" style="display:none"><label class="form-label">API Base URL</label>
-<input class="form-input" id="setApiBase" placeholder="https://your-endpoint.com/v1"></div>
-<div class="form-actions"><button type="submit" class="btn btn-primary" style="width:100%">Save</button></div>
-</form>
-<div class="form-status" id="settingsStatus"></div>
-</div></div></div>
+<div class="modal-body" style="display:flex;flex-direction:column;gap:20px;padding:20px 24px">
 
-<script src="/static/app.js?v=3.0"></script>
+<!-- Device Connection -->
+<div class="set-card">
+  <div class="set-card-head">
+    <span class="set-card-icon">&#128241;</span>
+    <div><div class="set-card-title">Device Connection</div><div class="set-card-sub">ADB devices and wireless pairing</div></div>
+  </div>
+  <div class="adb-device-list" id="adbDeviceList" style="margin-bottom:10px">Loading...</div>
+  <div class="adb-connect-row">
+    <input class="form-input" id="adbHostInput" placeholder="192.168.1.100:5555">
+    <button class="btn btn-primary btn-sm" onclick="adbConnect()">Connect</button>
+  </div>
+  <div class="adb-quick-actions">
+    <button class="btn btn-sm" onclick="adbEnableTcpip()">Enable TCP/IP (USB)</button>
+    <button class="btn btn-sm" onclick="refreshAdbDevices()">Refresh</button>
+  </div>
+  <div class="form-status" id="adbStatus"></div>
+</div>
+
+<!-- AI Vision -->
+<div class="set-card">
+  <div class="set-card-head">
+    <span class="set-card-icon">&#129504;</span>
+    <div><div class="set-card-title">AI Vision</div><div class="set-card-sub">Enables AI chat and screen element recognition</div></div>
+  </div>
+
+  <div class="form-group" style="margin-top:4px">
+    <label class="form-label">Provider</label>
+    <div class="provider-tabs">
+      <button type="button" class="prov-tab" data-prov="anthropic" onclick="selectProvider('anthropic')"><span class="prov-icon">&#129504;</span>Anthropic</button>
+      <button type="button" class="prov-tab" data-prov="openai" onclick="selectProvider('openai')"><span class="prov-icon">&#129302;</span>OpenAI</button>
+      <button type="button" class="prov-tab" data-prov="custom" onclick="selectProvider('custom')"><span class="prov-icon">&#9881;</span>Custom</button>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label class="form-label">API Key</label>
+    <div class="input-wrap">
+      <input class="form-input" type="password" id="setApiKey" placeholder="sk-...">
+      <button type="button" class="input-toggle" onclick="toggleApiKey()">&#128065;</button>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group" style="flex:1">
+      <label class="form-label">Model <span class="form-hint">(optional)</span></label>
+      <input class="form-input" id="setModel" placeholder="gpt-4o / claude-sonnet-5-20251001">
+    </div>
+  </div>
+
+  <div class="form-group" id="customUrlGroup" style="display:none">
+    <label class="form-label">API Base URL</label>
+    <input class="form-input" id="setApiBase" placeholder="https://your-endpoint.com/v1">
+  </div>
+
+  <button type="button" class="btn btn-primary" style="width:100%;margin-top:4px" onclick="saveVisionSettings()">Save Vision Settings</button>
+  <div class="form-status" id="settingsStatus"></div>
+</div>
+
+<!-- About -->
+<div class="set-card">
+  <div class="set-card-head">
+    <span class="set-card-icon">&#9889;</span>
+    <div><div class="set-card-title">Server Status</div><div class="set-card-sub">MCP transport and Web GUI endpoints</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" id="serverStatusGrid">
+    <div class="info-pill"><span class="pill-label">Web GUI</span><span class="pill-value">:8080</span></div>
+    <div class="info-pill"><span class="pill-label">MCP SSE</span><span class="pill-value">:9000/sse</span></div>
+    <div class="info-pill"><span class="pill-label">MCP HTTP</span><span class="pill-value">:9000/mcp</span></div>
+    <div class="info-pill"><span class="pill-label">Android</span><span class="pill-value">:18080</span></div>
+  </div>
+</div>
+
+</div></div></div><script src="/static/app.js?v=3.0"></script>
 </body>
 </html>

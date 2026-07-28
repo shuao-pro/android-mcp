@@ -223,3 +223,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
   .chat-send{padding:0 14px}.msg{max-width:90%}
 }
 .mobile-toggle{display:none}
+
+.set-card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;transition:border-color .2s var(--ease)}
+.set-card:hover{border-color:var(--border-focus)}
+.set-card-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
+.set-card-icon{font-size:24px;line-height:1;flex-shrink:0;width:36px;text-align:center}
+.set-card-title{font-size:14px;font-weight:700;margin-bottom:2px}
+.set-card-sub{font-size:11px;color:var(--text-muted)}
+.form-row{display:flex;gap:12px}
+.info-pill{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-xs);font-size:12px}
+.pill-label{color:var(--text-muted)}.pill-value{font-family:var(--mono);font-size:11px;color:var(--accent)}
