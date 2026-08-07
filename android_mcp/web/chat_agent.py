@@ -1,28 +1,23 @@
-"""AI Chat Agent — translates natural language to Android MCP tool calls.
+﻿"""AI Chat Agent — translates natural language to Android MCP tool calls.
 
 Uses the configured vision/LLM provider (Anthropic/OpenAI/custom) to interpret
 user requests and execute the appropriate device control tools.
 """
 
-import json
-import re
 from typing import Any
 
-from android_mcp.vision.clients import AnthropicVisionClient, OpenAIVisionClient
+from android_mcp.utils import parse_json_lenient
 
 # ========== Tool Registry ==========
-# Maps tool names to (function, description) for the LLM system prompt
 
 TOOL_REGISTRY: dict[str, tuple[callable, str]] = {}
 
 
 def _register(name: str, description: str):
     """Decorator to register a tool for the AI agent."""
-
     def decorator(fn):
         TOOL_REGISTRY[name] = (fn, description)
         return fn
-
     return decorator
 
 
@@ -149,11 +144,10 @@ async def _get_notifications():
     return await bridge.get_notifications()
 
 
-# ========== System Prompt Builder ==========
+# ========== System Prompt ==========
 
 
 def _build_system_prompt() -> str:
-    """Build the system prompt listing all available tools."""
     tools_text = ""
     for name, (_, desc) in TOOL_REGISTRY.items():
         tools_text += f"\n- **{name}**: {desc}"
@@ -176,42 +170,13 @@ Available tools:{tools_text}
 Respond ONLY with valid JSON. No markdown, no explanation."""
 
 
-# ========== Response Parser ==========
-
-
-def _parse_llm_response(text: str) -> dict[str, Any]:
-    """Parse LLM response into {tool, params} or {reply}."""
-    raw = text.strip()
-
-    # Strip markdown fences
-    fence = re.compile(r"^```(?:json)?\s*\n(.*?)\n```\s*$", re.DOTALL)
-    m = fence.match(raw)
-    if m:
-        raw = m.group(1).strip()
-
-    # Extract JSON object
-    if not raw.startswith("{"):
-        m = re.search(r"\{.*\}", raw, re.DOTALL)
-        if m:
-            raw = m.group(0)
-
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        # Try cleaning trailing commas
-        cleaned = re.sub(r",\s*([}\]])", r"\1", raw)
-        try:
-            return json.loads(cleaned)
-        except json.JSONDecodeError:
-            return {"reply": raw}
-
-
 # ========== Main Agent ==========
 
 
 def _get_llm_client():
     """Create an LLM client from config. Returns None if not configured."""
     from android_mcp.config import config
+    from android_mcp.vision.clients import AnthropicVisionClient, OpenAIVisionClient
 
     if not config.VISION_API_KEY:
         return None
@@ -241,12 +206,7 @@ def _get_llm_client():
 async def process_message(user_text: str, history: list[dict] | None = None) -> dict[str, Any]:
     """Process a user message, call the LLM, and execute any tool.
 
-    Args:
-        user_text: The user's natural language request.
-        history: Previous conversation turns (optional).
-
-    Returns:
-        dict with 'reply' (str) and optional 'tool_result' if a tool was called.
+    Returns dict with 'reply' (str) and optional 'tool_result' if a tool was called.
     """
     client = _get_llm_client()
     if client is None:
@@ -260,85 +220,21 @@ async def process_message(user_text: str, history: list[dict] | None = None) -> 
         }
 
     system_prompt = _build_system_prompt()
-
-    # Build messages
     messages = history or []
     messages.append({"role": "user", "content": user_text})
 
-    # For Anthropic, system is separate; for OpenAI, it's a message
-    from android_mcp.config import config
-    provider = config.VISION_PROVIDER.lower().strip()
+    try:
+        raw_text = await client.chat(system_prompt, messages)
+    except Exception as e:
+        return {"reply": f"LLM request failed: {e}", "error": True}
 
-    if provider == "anthropic":
-        # Use Anthropic-specific format via the client
-        import httpx, json as _json
+    # Parse LLM response using shared utility
+    try:
+        parsed = parse_json_lenient(raw_text)
+    except Exception:
+        return {"reply": raw_text.strip()}
 
-        payload = {
-            "model": getattr(client, "model", "claude-sonnet-5-20251001"),
-            "max_tokens": 1024,
-            "system": system_prompt,
-            "messages": [
-                {"role": m["role"], "content": m["content"]} for m in messages[-10:]  # last 10 turns
-            ],
-        }
-
-        async with httpx.AsyncClient() as http:
-            resp = await http.post(
-                "https://api.anthropic.com/v1/messages",
-                json=payload,
-                headers={
-                    "x-api-key": config.VISION_API_KEY,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
-                timeout=30.0,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            raw_text = "".join(
-                b.get("text", "")
-                for b in data.get("content", [])
-                if b.get("type") == "text"
-            )
-    else:
-        # OpenAI-compatible
-        import httpx, json as _json
-
-        openai_messages = [{"role": "system", "content": system_prompt}]
-        openai_messages.extend(
-            {"role": m["role"], "content": m["content"]} for m in messages[-10:]
-        )
-
-        base_url = (
-            config.VISION_API_BASE.rstrip("/") + "/chat/completions"
-            if config.VISION_API_BASE
-            else "https://api.openai.com/v1/chat/completions"
-        )
-
-        payload = {
-            "model": config.VISION_MODEL or "gpt-4o",
-            "max_tokens": 1024,
-            "messages": openai_messages,
-        }
-
-        async with httpx.AsyncClient() as http:
-            resp = await http.post(
-                base_url,
-                json=payload,
-                headers={
-                    "Authorization": f"Bearer {config.VISION_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                timeout=30.0,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            raw_text = data["choices"][0]["message"]["content"]
-
-    # Parse LLM response
-    parsed = _parse_llm_response(raw_text)
-
-    # If it's just a text reply, return it
+    # Text-only reply
     if "reply" in parsed and "tool" not in parsed:
         return {"reply": parsed["reply"]}
 
@@ -353,7 +249,6 @@ async def process_message(user_text: str, history: list[dict] | None = None) -> 
         }
 
     fn, _ = TOOL_REGISTRY[tool_name]
-
     try:
         result = await fn(**params)
         return {

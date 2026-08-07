@@ -31,18 +31,25 @@ class FileApi {
         if (path.isEmpty()) throw IllegalArgumentException("path required")
         if (content.isEmpty()) throw IllegalArgumentException("content required")
 
-        val encodedContent = if (base64) {
+        // Decode content (may be plain text or base64)
+        val decodedBytes = if (base64) {
             try {
-                String(Base64.decode(content, Base64.DEFAULT))
+                Base64.decode(content, Base64.DEFAULT)
             } catch (e: Exception) {
                 throw IllegalArgumentException("Invalid base64 content")
             }
         } else {
-            content.replace("'", "'\\''")
+            content.toByteArray(Charsets.UTF_8)
         }
 
+        // Write via base64 to avoid shell escaping issues
+        val b64 = Base64.encodeToString(decodedBytes, Base64.NO_WRAP)
+        val tmpPath = "/data/local/tmp/mcp_filewrite_${System.currentTimeMillis()}.tmp"
+        ShizukuHelper.exec("echo $b64 | base64 -d > $tmpPath 2>/dev/null")
+
         val redirect = if (append) ">>" else ">"
-        val result = ShizukuHelper.exec("echo '$encodedContent' $redirect '$path'")
+        val result = ShizukuHelper.exec("cat $tmpPath $redirect '$path'")
+        ShizukuHelper.exec("rm -f $tmpPath")
 
         return JSONObject().apply {
             put("success", result.isSuccess)
@@ -120,6 +127,10 @@ class FileApi {
         val recursive = params.optBoolean("recursive", false)
 
         if (path.isEmpty()) throw IllegalArgumentException("path required")
+        // Prevent dangerous recursive deletions
+        if (recursive && (path == "/" || path == "/data" || path == "/system" || path == "/sdcard")) {
+            throw IllegalArgumentException("Refusing to recursively delete root-level path: $path")
+        }
 
         val cmd = if (recursive) "rm -rf '$path'" else "rm -f '$path'"
         val result = ShizukuHelper.exec(cmd)

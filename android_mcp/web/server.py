@@ -26,6 +26,7 @@ app = FastAPI(title="Android MCP Dashboard", version="2.0")
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 
 _ws_clients: set[WebSocket] = set()
+_ws_lock = asyncio.Lock()
 
 
 @app.get("/")
@@ -56,14 +57,20 @@ async def api_setup_status():
 
     # Detect local network IP
     local_ip = "127.0.0.1"
+    _s = None
     try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.settimeout(0.1)
-        s.connect(("8.8.8.8", 80))
-        local_ip = s.getsockname()[0]
-        s.close()
+        _s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        _s.settimeout(0.1)
+        _s.connect(("8.8.8.8", 80))
+        local_ip = _s.getsockname()[0]
     except Exception:
         pass
+    finally:
+        if _s:
+            try:
+                _s.close()
+            except Exception:
+                pass
 
     mcp_port = config.MCP_PORT
 
@@ -133,7 +140,7 @@ async def api_setup_status():
         except Exception:
             pass
 
-    # Android MCP service (Shizuku, port 18080) — fast-fail in 2s
+    # Android MCP service (Shizuku, port 18080) 闂?fast-fail in 2s
     try:
         health = await asyncio.wait_for(bridge.health_check(), timeout=2.0)
     except asyncio.TimeoutError:
@@ -236,6 +243,15 @@ def _write_env_updates(updates: dict):
         f.writelines(new_lines)
 
 
+def _mask_api_key(key: str) -> str:
+    """Mask an API key for safe display: show first 6 and last 4 chars."""
+    if not key:
+        return ""
+    if len(key) <= 10:
+        return key[:2] + "***" + key[-2:]
+    return key[:6] + "***" + key[-4:]
+
+
 @app.get("/api/settings")
 async def api_get_settings():
     """Read all settings from .env."""
@@ -244,7 +260,8 @@ async def api_get_settings():
         "success": True,
         "data": {
             "vision_provider": env_data.get("VISION_PROVIDER", ""),
-            "vision_api_key": env_data.get("VISION_API_KEY", ""),
+            "vision_api_key": mask_api_key(env_data.get("VISION_API_KEY", "")),
+            "has_vision_api_key": bool(env_data.get("VISION_API_KEY", "")),
             "vision_api_base": env_data.get("VISION_API_BASE", ""),
             "vision_model": env_data.get("VISION_MODEL", ""),
             "android_host": env_data.get("ANDROID_HOST", "127.0.0.1"),

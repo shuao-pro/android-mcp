@@ -1,4 +1,4 @@
-"""Entry point for Android MCP Server.
+﻿"""Entry point for Android MCP Server.
 
 Usage:
     python -m android_mcp.main                  # all-sse (SSE+Streamable HTTP+Web GUI, default)
@@ -27,7 +27,6 @@ def check_android_connectivity() -> bool:
             timeout=3.0,
         )
         data = resp.json()
-        # Accept both JSON-RPC style {"result": "ok"} and legacy {"connected": true}
         if data.get("result") == "ok" or data.get("connected"):
             return True
     except Exception:
@@ -37,23 +36,12 @@ def check_android_connectivity() -> bool:
 
 def print_startup_banner(mode: str) -> None:
     """Print server startup banner with connectivity status."""
-    import socket as _socket
-
     from android_mcp.config import config
+    from android_mcp.utils import get_lan_ip
 
     host, port = config.WEB_HOST, config.WEB_PORT
     mcp_host, mcp_port = config.MCP_HOST, config.MCP_PORT
-
-    # Detect LAN IP for display
-    lan_ip = "127.0.0.1"
-    try:
-        s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
-        s.settimeout(0.1)
-        s.connect(("8.8.8.8", 80))
-        lan_ip = s.getsockname()[0]
-        s.close()
-    except Exception:
-        pass
+    lan_ip = get_lan_ip()
 
     print("=" * 60)
     print("  Android MCP Server v2.0.2")
@@ -80,8 +68,7 @@ def print_startup_banner(mode: str) -> None:
         print(f"  Web GUI:   http://{host}:{port}")
     print("-" * 60)
 
-    # Android device connectivity check
-    if mode != "web":  # web-only mode doesn't need Android
+    if mode != "web":
         print("  Checking Android device...", end=" ", flush=True)
         if check_android_connectivity():
             print("CONNECTED")
@@ -98,9 +85,8 @@ def print_startup_banner(mode: str) -> None:
     else:
         print()
 
-    # Windows Firewall hint
     if sys.platform == "win32" and mcp_host in ("0.0.0.0", lan_ip):
-        print("  💡 Windows Firewall may block port {}. Allow Python on first prompt.".format(mcp_port))
+        print(f"  💡 Windows Firewall may block port {mcp_port}. Allow Python on first prompt.")
 
     print("=" * 60)
 
@@ -121,11 +107,11 @@ def start_web_gui():
         task.cancel()
 
     app.router.lifespan_context = lifespan
-
     uvicorn.run(app, host=config.WEB_HOST, port=config.WEB_PORT, log_level="info")
 
 
 def parse_args():
+    """Parse command-line arguments."""
     import argparse
 
     parser = argparse.ArgumentParser(description="Android MCP Server")
@@ -142,44 +128,54 @@ def parse_args():
     return parser.parse_args()
 
 
-if __name__ == "__main__":
+def run(mode: str | None = None) -> None:
+    """Main entry point. Accepts mode string or parses CLI args if None.
+
+    Args:
+        mode: One of 'mcp', 'mcp-sse', 'mcp-http', 'web', 'all', 'all-sse'.
+              If None, parsed from sys.argv.
+    """
     from android_mcp.server import mcp, setup
     from android_mcp.config import config
 
     setup()
-    args = parse_args()
+
+    if mode is None:
+        args = parse_args()
+        mode = args.mode
+
     host, port = config.WEB_HOST, config.WEB_PORT
     mcp_host, mcp_port = config.MCP_HOST, config.MCP_PORT
 
-    if args.mode == "all-sse":
-        print_startup_banner("all-sse")
+    print_startup_banner(mode)
+
+    if mode == "all-sse":
         web_thread = threading.Thread(target=start_web_gui, daemon=True)
         web_thread.start()
         from android_mcp.server import run_mcp_combined
         asyncio.run(run_mcp_combined(mcp_host, mcp_port))
 
-    elif args.mode == "all":
-        print_startup_banner("all")
+    elif mode == "all":
         web_thread = threading.Thread(target=start_web_gui, daemon=True)
         web_thread.start()
         asyncio.run(mcp.run_stdio_async())
 
-    elif args.mode == "mcp-sse":
-        print_startup_banner("mcp-sse")
+    elif mode == "mcp-sse":
         print(f"  Connect your MCP client to: http://{mcp_host}:{mcp_port}/sse")
         from android_mcp.server import run_mcp_combined
         asyncio.run(run_mcp_combined(mcp_host, mcp_port))
 
-    elif args.mode == "mcp-http":
-        print_startup_banner("mcp-http")
+    elif mode == "mcp-http":
         print(f"  Connect your MCP client to: http://{mcp_host}:{mcp_port}/mcp")
         from android_mcp.server import run_mcp_streamable_http
         asyncio.run(run_mcp_streamable_http(mcp_host, mcp_port))
 
-    elif args.mode == "web":
-        print_startup_banner("web")
+    elif mode == "web":
         start_web_gui()
 
-    elif args.mode == "mcp":
-        print_startup_banner("mcp")
+    elif mode == "mcp":
         asyncio.run(mcp.run_stdio_async())
+
+
+if __name__ == "__main__":
+    run()

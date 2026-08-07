@@ -113,22 +113,17 @@ class InputApi {
         val text = params.optString("text", "")
         if (text.isEmpty()) throw IllegalArgumentException("text required")
 
-        val escaped = text
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("'", "\\'")
-            .replace(" ", "%s")
-            .replace("&", "\\&")
-            .replace("<", "\\<")
-            .replace(">", "\\>")
-            .replace("|", "\\|")
-            .replace(";", "\\;")
-            .replace("$", "\\$")
-            .replace("`", "\\`")
-            .replace("(", "\\(")
-            .replace(")", "\\)")
+        // Write text via base64 to temp file to avoid shell injection
+        val b64 = android.util.Base64.encodeToString(
+            text.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP
+        )
+        val tmpPath = "/data/local/tmp/mcp_input_${System.currentTimeMillis()}.txt"
 
-        val result = ShizukuHelper.exec("input text '$escaped'")
+        // Decode base64 to temp file, then pipe to input text (ID 2 = stderr redirected)
+        ShizukuHelper.exec("echo $b64 | base64 -d > $tmpPath 2>/dev/null")
+        val result = ShizukuHelper.exec("cat $tmpPath | input text")
+        ShizukuHelper.exec("rm -f $tmpPath")
+
         return JSONObject().apply {
             put("success", result.isSuccess)
             put("stdout", result.stdout)
