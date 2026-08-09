@@ -1,4 +1,4 @@
-"""Android MCP Server — CLI process manager (start/stop/status/restart/forward)."""
+"""Android MCP Server 鈥?CLI process manager (start/stop/status/restart/forward)."""
 
 import signal
 import os
@@ -142,7 +142,8 @@ def cmd_stop() -> None:
 
 
 def _get_process_runtime(pid: int) -> str:
-    """Get process uptime from /proc/{pid}/stat (Linux only)."""
+    """Get process uptime, cross-platform (Linux /proc, Windows psutil)."""
+    # Try Linux /proc first
     try:
         with open(f"/proc/{pid}/stat", "r") as f:
             stat = f.read()
@@ -150,21 +151,26 @@ def _get_process_runtime(pid: int) -> str:
         fields = stat[close_paren + 2:].split()
         starttime_ticks = int(fields[19])
         clk_tck = os.sysconf(os.sysconf_names["SC_CLK_TCK"])
-        uptime_ticks = time.time() - (starttime_ticks / clk_tck)
-        uptime_seconds = int(uptime_ticks)
-
-        hours = uptime_seconds // 3600
-        minutes = (uptime_seconds % 3600) // 60
-        seconds = uptime_seconds % 60
-
-        if hours > 0:
-            return f"{hours}h {minutes}m {seconds}s"
-        elif minutes > 0:
-            return f"{minutes}m {seconds}s"
-        else:
-            return f"{seconds}s"
+        uptime_seconds = int(time.time() - (starttime_ticks / clk_tck))
     except Exception:
-        return "unknown"
+        # Fallback: use psutil if available, otherwise return "unknown"
+        try:
+            import psutil
+            proc = psutil.Process(pid)
+            uptime_seconds = int(time.time() - proc.create_time())
+        except Exception:
+            return "unknown"
+
+    hours = uptime_seconds // 3600
+    minutes = (uptime_seconds % 3600) // 60
+    seconds = uptime_seconds % 60
+
+    if hours > 0:
+        return f"{hours}h {minutes}m {seconds}s"
+    elif minutes > 0:
+        return f"{minutes}m {seconds}s"
+    else:
+        return f"{seconds}s"
 
 
 def cmd_status() -> None:

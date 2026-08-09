@@ -1,7 +1,6 @@
-"""Prompt builder and response parser for vision model interactions."""
+﻿"""Prompt builder and response parser for vision model interactions."""
 
-import json
-import re
+from android_mcp.utils import parse_json_lenient
 from android_mcp.vision.models import BoundingBox, Element, VisionResult
 
 
@@ -55,33 +54,14 @@ def _parse_vision_response(json_text: str) -> VisionResult:
     - Trailing commas
     - Leading/trailing whitespace
     """
-    raw = json_text.strip()
-
-    # Strip markdown code fences if present
-    fence_pattern = re.compile(r"^```(?:json)?\s*\n(.*?)\n```\s*$", re.DOTALL)
-    match = fence_pattern.match(raw)
-    if match:
-        raw = match.group(1).strip()
-
-    # Try to extract JSON object if embedded in text
-    if not raw.startswith("{"):
-        obj_match = re.search(r"\{.*\}", raw, re.DOTALL)
-        if obj_match:
-            raw = obj_match.group(0)
-
     try:
-        data = json.loads(raw)
-    except json.JSONDecodeError:
-        # Try removing trailing commas before last ] or }
-        cleaned = re.sub(r",\s*([}\]])", r"\1", raw)
-        try:
-            data = json.loads(cleaned)
-        except json.JSONDecodeError as e:
-            return VisionResult(
-                found=False,
-                raw_response=json_text,
-                error=f"Failed to parse model response: {e}",
-            )
+        data = parse_json_lenient(json_text)
+    except Exception as e:
+        return VisionResult(
+            found=False,
+            raw_response=json_text,
+            error=f"Failed to parse model response: {e}",
+        )
 
     found = data.get("found", False)
     elements_data = data.get("elements", [])
@@ -108,7 +88,6 @@ def _parse_vision_response(json_text: str) -> VisionResult:
             )
         )
 
-    # Sort by confidence descending
     elements.sort(key=lambda e: e.confidence, reverse=True)
 
     return VisionResult(
