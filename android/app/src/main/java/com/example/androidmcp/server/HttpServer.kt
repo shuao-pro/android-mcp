@@ -12,6 +12,7 @@ import java.util.concurrent.Executors
 class HttpServer(
     private val port: Int = 18080,
     private val router: Router,
+    private val authToken: String = "",
     private val maxBodySize: Int = 10 * 1024 * 1024  // 10MB limit
 ) {
     private val tag = "HttpServer"
@@ -140,6 +141,21 @@ class HttpServer(
                     return
                 }
 
+                // Auth check: when a token is configured, require the X-MCP-Token header.
+                if (authToken.isNotBlank() && !isAuthorized(headers)) {
+                    val errorResponse = JSONObject().apply {
+                        put("jsonrpc", "2.0")
+                        put("error", JSONObject().apply {
+                            put("code", -32001)
+                            put("message", "Unauthorized: missing or invalid X-MCP-Token")
+                        })
+                        put("id", null)
+                    }
+                    writer.write(buildHttpResponse(errorResponse.toString(), 401))
+                    writer.flush()
+                    return
+                }
+
                 val responseJson = if (path == "/mcp" && requestJson != null) {
                     router.handle(requestJson)
                 } else if (path == "/health") {
@@ -169,11 +185,15 @@ class HttpServer(
         }
     }
 
+    private fun isAuthorized(headers: Map<String, String>): Boolean =
+        headers["x-mcp-token"] == authToken
+
     private fun buildHttpResponse(body: String, statusCode: Int = 200): String {
         val statusText = when (statusCode) {
             200 -> "OK"
             204 -> "No Content"
             400 -> "Bad Request"
+            401 -> "Unauthorized"
             413 -> "Payload Too Large"
             500 -> "Internal Server Error"
             else -> "OK"

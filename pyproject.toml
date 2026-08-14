@@ -19,11 +19,6 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
-
-[project.scripts]
-android-mcp = "android_mcp.gateway:main"
-
-[tool.uv]
 dependencies = [
     "mcp>=1.8.1",
     "httpx>=0.25.0",
@@ -32,6 +27,9 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "Pillow>=10.0.0",
 ]
+
+[project.scripts]
+android-mcp = "android_mcp.gateway:main"
 
 [tool.uv.scripts]
 start = "android-mcp start"

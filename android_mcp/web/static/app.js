@@ -412,7 +412,7 @@ function selectProvider(p){
   var modelEl = document.getElementById('setModel');
   var baseEl = document.getElementById('setApiBase');
   var hint = document.getElementById('modelHint');
-  var defaults = {anthropic:'claude-sonnet-5-20251001',openai:'gpt-4o',deepseek:'deepseek-chat',gemini:'gemini-2.5-pro-exp-03-25',custom:''};
+  var defaults = {anthropic:'claude-sonnet-5',openai:'gpt-4o',deepseek:'deepseek-chat',gemini:'gemini-2.5-pro-exp-03-25',custom:''};
   var bases = {anthropic:'https://api.anthropic.com',openai:'https://api.openai.com/v1',deepseek:'https://api.deepseek.com',gemini:'https://generativelanguage.googleapis.com/v1beta/openai',custom:''};
   if(defaults[p] && (!modelEl.value || modelEl.dataset.auto === '1')){
     modelEl.value = defaults[p]; modelEl.dataset.auto = '1';

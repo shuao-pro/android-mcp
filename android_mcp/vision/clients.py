@@ -15,7 +15,7 @@ class AnthropicVisionClient:
     def __init__(
         self,
         api_key: str,
-        model: str = "claude-sonnet-5-20251001",
+        model: str = "claude-sonnet-5",
         timeout: float = 30.0,
     ):
         self.api_key = api_key
@@ -24,10 +24,16 @@ class AnthropicVisionClient:
         self.timeout = timeout
 
     async def analyze_screenshot(
-        self, base64_image: str, target_description: str
+        self,
+        base64_image: str,
+        target_description: str,
+        screen_width: int = 0,
+        screen_height: int = 0,
     ) -> VisionResult:
         """Send screenshot to Claude Vision API."""
-        system_prompt = build_vision_prompt(target_description)
+        system_prompt = build_vision_prompt(
+            target_description, screen_width, screen_height
+        )
 
         payload = {
             "model": self.model,
@@ -101,6 +107,40 @@ class AnthropicVisionClient:
                 error=f"Vision API error: {e}",
             )
 
+    async def chat(self, system_prompt: str, messages: list[dict]) -> str:
+        """Send a plain-text chat request to the Anthropic Messages API.
+
+        Returns the assistant's text reply (empty string if none).
+        Raises on transport/HTTP errors; callers are expected to handle them.
+        """
+        payload = {
+            "model": self.model,
+            "max_tokens": 1024,
+            "system": system_prompt,
+            "messages": messages,
+        }
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                self.base_url,
+                json=payload,
+                headers={
+                    "x-api-key": self.api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                timeout=self.timeout,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+
+        text_parts = [
+            block.get("text", "")
+            for block in data.get("content", [])
+            if block.get("type") == "text"
+        ]
+        return "\n".join(text_parts).strip()
+
 
 class OpenAIVisionClient:
     """Vision client for OpenAI GPT-4o and OpenAI-compatible endpoints."""
@@ -122,10 +162,16 @@ class OpenAIVisionClient:
             self.base_url = "https://api.openai.com/v1/chat/completions"
 
     async def analyze_screenshot(
-        self, base64_image: str, target_description: str
+        self,
+        base64_image: str,
+        target_description: str,
+        screen_width: int = 0,
+        screen_height: int = 0,
     ) -> VisionResult:
         """Send screenshot to OpenAI / custom Vision API."""
-        system_prompt = build_vision_prompt(target_description)
+        system_prompt = build_vision_prompt(
+            target_description, screen_width, screen_height
+        )
 
         payload = {
             "model": self.model,
@@ -199,6 +245,36 @@ class OpenAIVisionClient:
                 error=f"Vision API error: {e}",
             )
 
+    async def chat(self, system_prompt: str, messages: list[dict]) -> str:
+        """Send a plain-text chat request to the OpenAI / custom chat API.
+
+        Returns the assistant's text reply (empty string if none).
+        Raises on transport/HTTP errors; callers are expected to handle them.
+        """
+        payload = {
+            "model": self.model,
+            "max_tokens": 1024,
+            "messages": [{"role": "system", "content": system_prompt}, *messages],
+        }
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                self.base_url,
+                json=payload,
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                timeout=self.timeout,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+
+        choices = data.get("choices", [])
+        if not choices:
+            return ""
+        return (choices[0].get("message", {}).get("content", "") or "").strip()
+
 
 def create_vision_client() -> Optional[VisionClient]:
     """Create a vision client from configuration.
@@ -215,7 +291,7 @@ def create_vision_client() -> Optional[VisionClient]:
     if provider == "anthropic":
         return AnthropicVisionClient(
             api_key=config.VISION_API_KEY,
-            model=config.VISION_MODEL or "claude-sonnet-5-20251001",
+            model=config.VISION_MODEL or "claude-sonnet-5",
         )
     elif provider == "openai":
         return OpenAIVisionClient(

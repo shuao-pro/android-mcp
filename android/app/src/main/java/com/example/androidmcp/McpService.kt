@@ -13,6 +13,7 @@ import android.util.Log
 import com.example.androidmcp.server.HttpServer
 import com.example.androidmcp.server.Router
 import com.example.androidmcp.util.ShizukuHelper
+import com.example.androidmcp.util.TokenStore
 import java.net.Inet4Address
 import java.net.NetworkInterface
 
@@ -113,7 +114,8 @@ class McpService : Service() {
 
     private fun startHttpServer() {
         val router = Router()
-        httpServer = HttpServer(PORT, router)
+        val token = TokenStore.getOrCreate(this)
+        httpServer = HttpServer(PORT, router, authToken = token)
 
         ShizukuHelper.checkStatus()
         Log.i(TAG, "Shizuku available: ${ShizukuHelper.isAvailable}, granted: ${ShizukuHelper.isPermissionGranted}")

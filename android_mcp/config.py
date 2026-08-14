@@ -9,6 +9,8 @@ class Config:
     ANDROID_HOST: str = os.getenv("ANDROID_HOST", "127.0.0.1")
     ANDROID_PORT: int = int(os.getenv("ANDROID_PORT", "18080"))
     ANDROID_BASE_URL: str = f"http://{ANDROID_HOST}:{ANDROID_PORT}"
+    # Shared auth token for the Android bridge (shown in the app UI)
+    ANDROID_TOKEN: str = os.getenv("ANDROID_TOKEN", "")
 
     # Request timeout (seconds)
     REQUEST_TIMEOUT: float = float(os.getenv("REQUEST_TIMEOUT", "30.0"))
@@ -18,8 +20,8 @@ class Config:
     WEB_PORT: int = int(os.getenv("WEB_PORT", "8080"))
 
     # MCP SSE server (HTTP transport for web frontends)
-    # Use 0.0.0.0 to accept connections from other devices
-    MCP_HOST: str = os.getenv("MCP_HOST", "0.0.0.0")
+    # Defaults to loopback for security; set to 0.0.0.0 to serve LAN clients.
+    MCP_HOST: str = os.getenv("MCP_HOST", "127.0.0.1")
     MCP_PORT: int = int(os.getenv("MCP_PORT", "9000"))
 
     # Screenshot save path

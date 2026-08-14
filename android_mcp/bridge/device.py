@@ -12,10 +12,12 @@ async def health_check() -> dict[str, Any]:
     """Check Android device connection and Shizuku state."""
     await _ensure_adb_forward()
     try:
+        headers = {"X-MCP-Token": config.ANDROID_TOKEN} if config.ANDROID_TOKEN else {}
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 f"{config.ANDROID_BASE_URL}/health",
                 timeout=5.0,
+                headers=headers,
             )
             data = resp.json()
             if data.get("result") == "ok" or data.get("connected"):

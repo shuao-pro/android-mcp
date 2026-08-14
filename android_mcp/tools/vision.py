@@ -1,5 +1,6 @@
 """Tools: vision model-based UI element recognition and clicking."""
 
+import re
 from typing import Dict, Any
 
 from android_mcp import bridge
@@ -30,15 +31,19 @@ async def tool_find_element(description: str) -> Dict[str, Any]:
         try:
             device_info = await bridge.get_device_info()
             if device_info.get("success"):
+                # screen_resolution is the raw `wm size` output, e.g.
+                # "Physical size: 1080x2400" — extract the two integers.
                 display = device_info.get("screen_resolution", "").strip()
-                if "x" in display:
-                    parts = display.split("x")
-                    screen_width = int(parts[0].strip())
-                    screen_height = int(parts[1].strip())
+                m = re.search(r"(\d+)\s*x\s*(\d+)", display)
+                if m:
+                    screen_width = int(m.group(1))
+                    screen_height = int(m.group(2))
         except Exception:
             pass
 
-        result = await client.analyze_screenshot(base64_image, description)
+        result = await client.analyze_screenshot(
+            base64_image, description, screen_width, screen_height
+        )
 
         return {
             "success": result.found,

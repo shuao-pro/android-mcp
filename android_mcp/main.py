@@ -22,9 +22,11 @@ def check_android_connectivity() -> bool:
     try:
         from android_mcp.config import config
 
+        headers = {"X-MCP-Token": config.ANDROID_TOKEN} if config.ANDROID_TOKEN else {}
         resp = httpx.get(
             f"{config.ANDROID_BASE_URL}/health",
             timeout=3.0,
+            headers=headers,
         )
         data = resp.json()
         if data.get("result") == "ok" or data.get("connected"):
@@ -81,7 +83,8 @@ def print_startup_banner(mode: str) -> None:
             print("  To fix:")
             print(f"  1. Start Shizuku on your phone")
             print(f"  2. Open Android MCP app → tap Start")
-            print(f"  3. Run: adb forward tcp:{config.ANDROID_PORT} tcp:{config.ANDROID_PORT}")
+            print(f"  3. Copy the token shown in the app into .env → ANDROID_TOKEN=")
+            print(f"  4. Run: adb forward tcp:{config.ANDROID_PORT} tcp:{config.ANDROID_PORT}")
     else:
         print()
 

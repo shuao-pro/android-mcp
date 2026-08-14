@@ -39,7 +39,11 @@ class VisionClient(Protocol):
     """Protocol for vision model clients."""
 
     async def analyze_screenshot(
-        self, base64_image: str, target_description: str
+        self,
+        base64_image: str,
+        target_description: str,
+        screen_width: int = 0,
+        screen_height: int = 0,
     ) -> VisionResult:
         """Send a screenshot to the vision model and locate a UI element."""
         ...
