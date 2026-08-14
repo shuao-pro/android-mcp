@@ -42,19 +42,47 @@ def read_pid(name: str) -> int | None:
         return None
 
 
-def is_running(name: str) -> bool:
-    pid = read_pid(name)
-    if pid is None:
+def _pid_exists(pid: int) -> bool:
+    """Check whether a PID is alive, cross-platform.
+
+    os.kill(pid, 0) is NOT a reliable liveness check on Windows: signal 0 maps
+    to GenerateConsoleCtrlEvent(CTRL_C_EVENT, pid), which raises WinError 87 for
+    any pid outside the current console group — dead or alive. Use psutil when
+    available, falling back to OpenProcess on Windows and os.kill(0) on POSIX.
+    """
+    try:
+        import psutil
+    except ImportError:
+        psutil = None
+
+    if psutil is not None:
+        return psutil.pid_exists(pid)
+
+    if os.name == "nt":
+        import ctypes
+
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        if handle:
+            kernel32.CloseHandle(handle)
+            return True
         return False
+
     try:
         os.kill(pid, 0)
         return True
     except PermissionError:
         return True  # process exists but isn't ours to signal
-    except OSError:
-        # POSIX raises ProcessLookupError; Windows raises WinError 87 for a
-        # dead pid. Both mean the process is gone.
+    except (ProcessLookupError, OSError):
         return False
+
+
+def is_running(name: str) -> bool:
+    pid = read_pid(name)
+    if pid is None:
+        return False
+    return _pid_exists(pid)
 
 
 def cleanup_pid(name: str) -> None:
@@ -80,8 +108,10 @@ def cmd_start() -> None:
         warn("Web GUI is already running")
         return
 
+    # --mode mcp is stdio-only (no listening port) and dies immediately when
+    # detached. Use mcp-sse so the MCP server actually listens on MCP_PORT.
     mcp_proc = subprocess.Popen(
-        [sys.executable, "-m", "android_mcp.main", "--mode", "mcp"],
+        [sys.executable, "-m", "android_mcp.main", "--mode", "mcp-sse"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
@@ -114,9 +144,7 @@ def _stop_service(name: str) -> None:
 
     for _ in range(10):
         time.sleep(0.5)
-        try:
-            os.kill(pid, 0)
-        except ProcessLookupError:
+        if not _pid_exists(pid):
             cleanup_pid(name)
             ok(f"{display_name} stopped")
             return
