@@ -19,6 +19,8 @@ async def health_check() -> dict[str, Any]:
                 timeout=5.0,
                 headers=headers,
             )
+            if resp.status_code == 401:
+                return {"connected": False, "error": "auth failed: ANDROID_TOKEN missing or invalid"}
             data = resp.json()
             if data.get("result") == "ok" or data.get("connected"):
                 return {"connected": True, "shizuku_running": True}

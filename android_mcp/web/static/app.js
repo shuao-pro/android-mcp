@@ -373,6 +373,12 @@ function openSetup(){
   checkSetup();
 }
 function closeSetup(){ document.getElementById('setupModal').classList.remove('show'); }
+function setupServiceDetail(r){
+  var d = r.android_service_detail || {};
+  if (d.device_name) return d.device_name + (d.android_version ? ' (Android ' + d.android_version + ')' : '');
+  if (d.error) return d.error;
+  return 'Port 18080';
+}
 function checkSetup(){
   var steps = document.getElementById('wizSteps');
   steps.innerHTML = '<div class="wiz-step"><div class="wiz-content"><div class="wiz-title">Checking...</div></div></div>';
@@ -380,7 +386,8 @@ function checkSetup(){
     var items = [
       {key:'adb_installed',title:'ADB',desc:'Android SDK Platform Tools',detail:r.adb_path||'Not found',pass:r.adb_installed},
       {key:'adb_device',title:'Device',desc:'USB or wireless ADB',detail:r.adb_device_info||(r.adb_device_list&&r.adb_device_list.length)+' device(s)',pass:r.adb_device},
-      {key:'android_service',title:'Android MCP Service',desc:'Start Shizuku + Android MCP on phone',detail:r.android_service_detail&&r.android_service_detail.ip||'Port 18080',pass:r.android_service},
+      {key:'token_configured',title:'Auth Token',desc:'Bridge token in .env (copy from phone app)',detail:r.token_configured?'Configured':'Not set',pass:r.token_configured},
+      {key:'android_service',title:'Android MCP Service',desc:'Start Shizuku + Android MCP on phone',detail:setupServiceDetail(r),pass:r.android_service},
       {key:'dotenv_exists',title:'.env Config',desc:'Environment file',detail:r.dotenv_path,pass:r.dotenv_exists},
       {key:'vision_configured',title:'AI Vision API',desc:'Claude/GPT-4o for element recognition',detail:r.vision_provider||'Not set',pass:r.vision_configured,optional:true}
     ];
