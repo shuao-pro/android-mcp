@@ -30,12 +30,16 @@ async def _send(method: str, params: dict[str, Any] | None = None) -> dict[str, 
     await _ensure_adb_forward()
 
     try:
+        headers = {"Content-Type": "application/json"}
+        if config.ANDROID_TOKEN:
+            headers["X-MCP-Token"] = config.ANDROID_TOKEN
+
         async with httpx.AsyncClient() as client:
             resp = await client.post(
                 f"{config.ANDROID_BASE_URL}/mcp",
                 json=payload,
                 timeout=config.REQUEST_TIMEOUT,
-                headers={"Content-Type": "application/json"},
+                headers=headers,
             )
             raw_body = resp.text
 

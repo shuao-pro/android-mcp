@@ -8,17 +8,12 @@ Supports three transport modes:
 """
 
 from mcp.server.fastmcp import FastMCP
-from mcp.server.transport_security import TransportSecuritySettings
 
-# Disable DNS rebinding protection — this is a local-network tool where
-# phones connect via LAN IP (e.g. 192.168.x.x). The default only allows
-# localhost; we relax it for WiFi-based device access.
-#
-# NOTE: TransportSecuritySettings does NOT support IP octet wildcards
-# (e.g. "192.168.*.*"), so we must disable the check entirely.
-TRANSPORT_SECURITY = TransportSecuritySettings(
-    enable_dns_rebinding_protection=False,
-)
+# DNS rebinding protection is left enabled (the MCP default): it rejects
+# requests whose Host header is not localhost. This is safe now that
+# MCP_HOST defaults to 127.0.0.1. If you explicitly set MCP_HOST=0.0.0.0 to
+# serve LAN clients (e.g. Kai 9000 on a phone), configure allowed hosts or
+# disable this protection via transport_security.
 
 mcp = FastMCP(
     name="Android MCP Server",
@@ -29,7 +24,6 @@ mcp = FastMCP(
         "system settings read/write, clipboard, notifications, and more. "
         "All through Shizuku's elevated permissions (UID 2000)."
     ),
-    transport_security=TRANSPORT_SECURITY,
 )
 
 

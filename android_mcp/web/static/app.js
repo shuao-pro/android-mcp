@@ -49,14 +49,14 @@ var I = {
     streamClick:'\u25b6 \u70b9\u51fb\u64ad\u653e'
   }
 };
-var lang = localStorage.getItem('lang') || 'en';
-function t(k){ return (T[lang]||T.en)[k]||k; }
+function t(k){ return (I[lang]||I.en)[k]||k; }
 
 (function init(){
   applyI18n();
   connectWS();
   updateClock(); setInterval(updateClock, 30000);
-  refreshDeviceInfo();
+  refreshStatus(); setInterval(refreshStatus, 5000);
+  refreshDeviceInfo(); setInterval(refreshDeviceInfo, 10000);
 
   // Auto-show setup wizard if device not connected (once per session)
   if(!sessionStorage.getItem('setupShown')){
@@ -78,16 +78,16 @@ function updateClock(){
 
 // ===== WebSocket /ws =====
 function connectWS(){
-  if(ws && ws.readyState === WebSocket.OPEN) return;
+  if(ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
   var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   ws = new WebSocket(proto + '//' + location.host + '/ws');
   ws.onopen = function(){
-    document.getElementById('statusDot').classList.add('online');
-    document.getElementById('statusLabel').textContent = t('connected');
+    refreshStatus();
   };
   ws.onclose = function(){
     document.getElementById('statusDot').classList.remove('online');
     document.getElementById('statusLabel').textContent = t('disconnected');
+    if(wsReconnectTimer) clearTimeout(wsReconnectTimer);
     wsReconnectTimer = setTimeout(connectWS, 3000);
   };
   ws.onmessage = handleWS;
@@ -122,7 +122,7 @@ function sendWS(cmd, params, cb){
 
 // ===== Device Info =====
 function refreshDeviceInfo(){
-  sendWS('get_device_info', {}, function(r){
+  sendWS('device_info', {}, function(r){
     if(!r || !r.success) return;
     var d = r.data || r;
     setVal('devModel', (d.model || d.manufacturer || '--').substring(0,20));
@@ -144,11 +144,34 @@ function setVal(id, val){
   if(el) el.textContent = val;
 }
 
+function refreshStatus(){
+  sendWS('health', {}, function(r){
+    if(!r) return;
+    var dot = document.getElementById('statusDot');
+    var label = document.getElementById('statusLabel');
+    if(r.connected){
+      dot.classList.add('online');
+      label.textContent = t('connected');
+      setVal('devShizuku', r.shizuku_running ? 'Running' : '--');
+    } else {
+      dot.classList.remove('online');
+      label.textContent = t('disconnected');
+      setVal('devShizuku', 'Off');
+    }
+  });
+}
+
 // ===== Quick Actions =====
 function quick(cmd, params){
   if(cmd === 'screenshot' || cmd === 'take_screenshot'){
-    sendWS('take_screenshot', {}, function(r){
-      toast(r && r.success ? 'Screenshot saved' : 'Failed: ' + (r&&r.error||'unknown'));
+    sendWS('screenshot', {}, function(r){
+      if(r && r.success){
+        var b64 = r.data && r.data.base64;
+        if(b64){ downloadB64(b64, 'screenshot.png'); toast('Screenshot saved'); }
+        else { toast('Screenshot captured'); }
+      } else {
+        toast('Failed: ' + (r && r.error || 'unknown'));
+      }
     });
   } else if(cmd === 'press_key'){
     sendWS(cmd, params, function(r){
@@ -320,19 +343,26 @@ function sendChat(){
   inp.value = ''; inp.style.height = 'auto';
   var w = document.getElementById('chatWelcome'); if(w) w.remove();
   renderMsg('user', text);
-  var ti = document.createElement('div'); ti.className = 'typing-indicator';
+  chatHistory.push({role:'user',content:text});
+  deliverChat(text, 0);
+}
+function deliverChat(text, retries){
+  var ti = document.querySelector('#chat-messages .typing-indicator');
+  if(ti) ti.remove();
+  ti = document.createElement('div'); ti.className = 'typing-indicator';
   ti.innerHTML = '<span></span><span></span><span></span>';
   document.getElementById('chat-messages').appendChild(ti);
   document.getElementById('chat-messages').scrollTop = 9e9;
-  var history = chatHistory.slice(-10).map(function(h){ return {role:h.role,content:h.content}; });
+  var history = chatHistory.slice(-11,-1).map(function(h){ return {role:h.role,content:h.content}; });
   if(ws && ws.readyState === WebSocket.OPEN){
     ws.send(JSON.stringify({cmd:'chat',text:text,history:history}));
-  } else {
+  } else if(retries < 20){
     connectWS();
-    setTimeout(function(){ sendChat(); }, 500);
-    return;
+    setTimeout(function(){ deliverChat(text, retries + 1); }, 500);
+  } else {
+    ti.remove();
+    renderChatReply({success:false, error:'connection lost'});
   }
-  chatHistory.push({role:'user',content:text});
 }
 function sendExample(t){ document.getElementById('chatInput').value = t; sendChat(); }
 function renderMsg(role, text){
@@ -368,23 +398,44 @@ function toast(msg){
 }
 
 // ===== Setup Wizard =====
+var setupSyncTimer = null, setupChecking = false;
 function openSetup(){
   document.getElementById('setupModal').classList.add('show');
   checkSetup();
+  // Auto-sync the check status while the wizard is open so the connection
+  // state stays live (e.g. user connects the device after opening the wizard).
+  if(!setupSyncTimer) setupSyncTimer = setInterval(checkSetup, 3000);
 }
-function closeSetup(){ document.getElementById('setupModal').classList.remove('show'); }
+function closeSetup(){
+  document.getElementById('setupModal').classList.remove('show');
+  if(setupSyncTimer){ clearInterval(setupSyncTimer); setupSyncTimer = null; }
+}
+function setupServiceDetail(r){
+  var d = r.android_service_detail || {};
+  if (d.device_name) return d.device_name + (d.android_version ? ' (Android ' + d.android_version + ')' : '');
+  if (d.error) return d.error;
+  return 'Port 18080';
+}
 function checkSetup(){
+  if(setupChecking) return;
+  setupChecking = true;
   var steps = document.getElementById('wizSteps');
-  steps.innerHTML = '<div class="wiz-step"><div class="wiz-content"><div class="wiz-title">Checking...</div></div></div>';
+  // Only show the placeholder on first load; afterwards update in place so the
+  // auto-sync doesn't flash the list on every poll.
+  if(!steps.dataset.loaded){
+    steps.innerHTML = '<div class="wiz-step"><div class="wiz-content"><div class="wiz-title">Checking...</div></div></div>';
+  }
   fetch('/api/setup/status').then(function(r){ return r.json(); }).then(function(r){
     var items = [
       {key:'adb_installed',title:'ADB',desc:'Android SDK Platform Tools',detail:r.adb_path||'Not found',pass:r.adb_installed},
       {key:'adb_device',title:'Device',desc:'USB or wireless ADB',detail:r.adb_device_info||(r.adb_device_list&&r.adb_device_list.length)+' device(s)',pass:r.adb_device},
-      {key:'android_service',title:'Android MCP Service',desc:'Start Shizuku + Android MCP on phone',detail:r.android_service_detail&&r.android_service_detail.ip||'Port 18080',pass:r.android_service},
+      {key:'token_configured',title:'Auth Token',desc:'Bridge token in .env (copy from phone app)',detail:r.token_configured?'Configured':'Not set',pass:r.token_configured},
+      {key:'android_service',title:'Android MCP Service',desc:'Start Shizuku + Android MCP on phone',detail:setupServiceDetail(r),pass:r.android_service},
       {key:'dotenv_exists',title:'.env Config',desc:'Environment file',detail:r.dotenv_path,pass:r.dotenv_exists},
       {key:'vision_configured',title:'AI Vision API',desc:'Claude/GPT-4o for element recognition',detail:r.vision_provider||'Not set',pass:r.vision_configured,optional:true}
     ];
     var passCount = 0, failCount = 0;
+    steps.dataset.loaded = '1';
     steps.innerHTML = items.map(function(it,i){
       var cls = it.pass ? 'pass' : 'fail';
       if(it.pass) passCount++; else if(!it.optional) failCount++;
@@ -395,10 +446,12 @@ function checkSetup(){
         '<div class="wiz-status '+cls+'">'+(it.pass?'OK':'Fail')+'</div></div>';
     }).join('');
     var sm = document.getElementById('setupSummary');
-    sm.textContent = passCount+'/'+items.length+' checks passed';
-    sm.className = failCount > 0 ? '' : '';
+    sm.textContent = passCount+'/'+items.length+' checks passed · auto-sync';
+    setupChecking = false;
   }).catch(function(e){
+    steps.dataset.loaded = '1';
     steps.innerHTML = '<div class="wiz-step fail"><div class="wiz-content"><div class="wiz-title">Error</div><div class="wiz-desc">'+escHtml(e.message)+'</div></div></div>';
+    setupChecking = false;
   });
 }
 
@@ -412,7 +465,7 @@ function selectProvider(p){
   var modelEl = document.getElementById('setModel');
   var baseEl = document.getElementById('setApiBase');
   var hint = document.getElementById('modelHint');
-  var defaults = {anthropic:'claude-sonnet-5-20251001',openai:'gpt-4o',deepseek:'deepseek-chat',gemini:'gemini-2.5-pro-exp-03-25',custom:''};
+  var defaults = {anthropic:'claude-sonnet-5',openai:'gpt-4o',deepseek:'deepseek-chat',gemini:'gemini-2.5-pro-exp-03-25',custom:''};
   var bases = {anthropic:'https://api.anthropic.com',openai:'https://api.openai.com/v1',deepseek:'https://api.deepseek.com',gemini:'https://generativelanguage.googleapis.com/v1beta/openai',custom:''};
   if(defaults[p] && (!modelEl.value || modelEl.dataset.auto === '1')){
     modelEl.value = defaults[p]; modelEl.dataset.auto = '1';
@@ -517,9 +570,7 @@ function applyI18n(){
   var qa = document.querySelectorAll('.qa-btn');
   var qkeys = ['home','back','recent','power','volUp','volDown','enter','delete'];
   qa.forEach(function(el,i){ if(qkeys[i]) el.childNodes[1].textContent = t(qkeys[i]); });
-  // Screen buttons
-  var sbtns = document.querySelector('#right-panel .btn');
-  if(sbtns) sbtns.childNodes[0].textContent = t('scrcpy');
+  // Screen buttons (Play text handled by updateStreamUI; "scrcpy" is a brand name)
   var svbtn = document.querySelector('#right-panel .btn-sm');
   if(svbtn) svbtn.childNodes[0].textContent = t('save');
   // Welcome
@@ -574,4 +625,12 @@ function escHtml(s){
   var d = document.createElement('div');
   d.textContent = s;
   return d.innerHTML;
+}
+function downloadB64(b64, filename){
+  var a = document.createElement('a');
+  a.href = 'data:image/png;base64,' + b64;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }

@@ -28,7 +28,7 @@ flowchart LR
     C["📱 Android Device<br/>Shizuku App :18080"]
 
     A <-->|"SSE / stdio / HTTP<br/>:9000"| B
-    B <-->|"JSON-RPC<br/>ADB tunnel"| C
+    B <-->|"JSON-RPC + token auth<br/>ADB tunnel"| C
 
     B -.->|"Vision API"| D["🧠 AI Vision<br/>Claude / GPT-4o"]
     C -.->|"UID 2000"| E["⚡ System APIs<br/>Shell / Input / Files"]
@@ -148,6 +148,7 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 1. Start **Shizuku** (grant root or wireless debugging permission)
 2. Open **Android MCP** app → grant Shizuku permission → tap **Start**
 3. Notification shows "MCP service running" on port 18080
+4. Copy the **auth token** shown in the app into `.env` → `ANDROID_TOKEN=`
 
 ### 4. Start Server
 
@@ -197,13 +198,16 @@ Edit `.env`:
 ANDROID_HOST=127.0.0.1
 ANDROID_PORT=18080
 
+# Android bridge auth token (shown in the app UI — copy it here)
+ANDROID_TOKEN=
+
 # Web GUI
 WEB_HOST=127.0.0.1
 WEB_PORT=8080
 
 # MCP Server (SSE + Streamable HTTP) — for Kai 9000 & other clients
-# Use 0.0.0.0 to accept WiFi/phone connections; 127.0.0.1 for local-only
-MCP_HOST=0.0.0.0
+# Defaults to 127.0.0.1 (local-only, secure); set 0.0.0.0 for WiFi/phone clients
+MCP_HOST=127.0.0.1
 MCP_PORT=9000
 
 # AI Vision (optional — enables AI chat + element recognition)
@@ -237,13 +241,23 @@ python -m android_mcp.gateway forward       # Set up ADB port forward
 ```
 android-mcp/
 ├── android_mcp/
-│   ├── server.py          # FastMCP server definition
-│   ├── main.py            # Entry point
-│   ├── config.py          # Environment config
-│   ├── bridge.py          # HTTP bridge to Android
+│   ├── server.py          # FastMCP server definition (tool registry)
+│   ├── main.py            # Entry point (mode dispatch)
+│   ├── config.py          # Environment config (.env loader)
+│   ├── console.py         # Colored console output helpers
+│   ├── utils.py           # LAN IP + version helpers
 │   ├── gateway.py         # CLI process manager
-│   ├── tools/             # MCP tool implementations (by domain)
-│   │   ├── device.py      # Health, info, screenshot
+│   ├── bridge/            # Low-level HTTP bridge to Android device
+│   │   ├── __init__.py    # Re-exports all bridge functions
+│   │   ├── _core.py       # JSON-RPC transport + ADB forward helpers
+│   │   ├── device.py      # Health, info, screenshot, shell, reboot
+│   │   ├── input.py       # Click, swipe, drag, keys, type_text
+│   │   ├── apps.py        # Package management
+│   │   ├── system.py      # Battery, clipboard, notifications, settings
+│   │   └── files.py       # File read/write/list/delete
+│   ├── tools/             # MCP tool layer (thin wrappers over bridge)
+│   │   ├── decorators.py  # @bridge_call error-handling decorator
+│   │   ├── device.py      # Health, info, battery, screenshot, UI hierarchy
 │   │   ├── input.py       # Touch, swipe, keys
 │   │   ├── apps.py        # Package management
 │   │   ├── system.py      # Shell, settings, clipboard
@@ -274,12 +288,16 @@ android-mcp/
 │   │   │   │   ├── HttpServer.kt  # Embedded HTTP server (:18080)
 │   │   │   │   └── Router.kt      # JSON-RPC method dispatch
 │   │   │   └── util/
-│   │   │       └── ShizukuHelper.kt # Shizuku binder wrapper
+│   │   │       ├── ShizukuHelper.kt # Shizuku binder wrapper
+│   │   │       └── TokenStore.kt    # Bridge auth token (generate + persist)
 │   │   └── res/                   # Layout, drawable, strings
 │   ├── gradle/                    # Gradle wrapper
 │   ├── build.gradle.kts
 │   └── settings.gradle.kts
 ├── scripts/setup.sh       # First-time setup
+├── tests/                 # Test scripts
+│   ├── test_adb.py        # ADB bridge tests
+│   └── test_all.py        # End-to-end tests
 ├── start.sh               # One-click start
 ├── start.bat              # Windows launcher
 ├── pyproject.toml

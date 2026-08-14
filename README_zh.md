@@ -20,18 +20,18 @@
 
 ## 🏗️ 架构
 
- + "`" + mermaid
+```mermaid
 flowchart LR
     A["🤖 MCP 客户端<br/>Claude / Kai 9000 / Cherry"]
     B["🐍 Python 服务器<br/>FastMCP + Web GUI :8080"]
     C["📱 Android 设备<br/>Shizuku App :18080"]
 
     A <-->|"SSE / stdio / HTTP<br/>:9000"| B
-    B <-->|"JSON-RPC<br/>ADB 隧道"| C
+    B <-->|"JSON-RPC + Token 鉴权<br/>ADB 隧道"| C
 
     B -.->|"视觉 API"| D["🧠 AI 视觉<br/>Claude / GPT-4o"]
     C -.->|"UID 2000"| E["⚡ 系统 API<br/>Shell / 触控 / 文件"]
- + "`" + 
+```
 
 | 层级 | 角色 | 关键技术 |
 |------|------|----------|
@@ -39,7 +39,9 @@ flowchart LR
 | 🐍 **Python 服务器** | 工具注册、Web GUI、AI 聊天代理 | FastMCP + FastAPI + WebSocket |
 | 📱 **Android 应用** | 设备端系统级执行 | Shizuku (UID 2000)、HTTP JSON-RPC |
 
-> 💡 服务器可直接在手机上运行（Termux / Kai 9000）。设置  + "ANDROID_HOST=127.0.0.1" +  — 无需 ADB。
+> 🔒 **通信鉴权**：Python 网关 ↔ Android 应用通过共享 `X-MCP-Token` 统一鉴权。App 随机生成 token 并显示在界面，复制到 `.env` 的 `ANDROID_TOKEN=` 即可。默认 `MCP_HOST=127.0.0.1`（仅本机访问）。
+
+> 💡 服务器可直接在手机上运行（Termux / Kai 9000）。设置 `ANDROID_HOST=127.0.0.1` — 无需 ADB。
 ## 功能特性
 
 ### 设备控制（29 个 MCP 工具）
@@ -151,6 +153,7 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 1. 启动 **Shizuku**（授予 root 或无线调试权限）
 2. 打开 **Android MCP** 应用 → 授予 Shizuku 权限 → 点击 **启动**
 3. 通知栏显示"MCP 服务运行中"（端口 18080）
+4. 复制界面显示的 **鉴权 Token**，填入 `.env` 的 `ANDROID_TOKEN=`
 
 ### 4. 启动服务
 
@@ -200,13 +203,16 @@ start.bat
 ANDROID_HOST=127.0.0.1
 ANDROID_PORT=18080
 
+# Android 桥接鉴权 Token（App 界面显示，复制到这里）
+ANDROID_TOKEN=
+
 # Web 控制台
 WEB_HOST=127.0.0.1
 WEB_PORT=8080
 
 # MCP 服务（SSE + Streamable HTTP）— 供 Kai 9000 等客户端接入
-# 用 0.0.0.0 接受 WiFi/手机连接；127.0.0.1 仅本地访问
-MCP_HOST=0.0.0.0
+# 默认 127.0.0.1（仅本机，安全）；如需手机/WiFi 客户端连接改为 0.0.0.0
+MCP_HOST=127.0.0.1
 MCP_PORT=9000
 
 # AI 视觉（可选 — 启用 AI 对话和元素识别）
@@ -240,13 +246,23 @@ python -m android_mcp.gateway forward       # ADB 端口转发
 ```
 android-mcp/
 ├── android_mcp/
-│   ├── server.py          # FastMCP 服务定义
-│   ├── main.py            # 入口
-│   ├── config.py          # 环境配置
-│   ├── bridge.py          # Android HTTP 桥接
+│   ├── server.py          # FastMCP 服务定义（工具注册）
+│   ├── main.py            # 入口（模式分发）
+│   ├── config.py          # 环境配置（.env 加载）
+│   ├── console.py         # 彩色控制台输出
+│   ├── utils.py           # 局域网 IP + 版本工具
 │   ├── gateway.py         # CLI 进程管理
-│   ├── tools/             # MCP 工具实现（按领域拆分）
-│   │   ├── device.py      # 健康检查、设备信息、截图
+│   ├── bridge/            # 底层 Android HTTP 桥接
+│   │   ├── __init__.py    # 重新导出所有桥接函数
+│   │   ├── _core.py       # JSON-RPC 传输 + ADB 转发
+│   │   ├── device.py      # 健康、信息、截图、Shell、重启
+│   │   ├── input.py       # 点击、滑动、拖拽、按键、输入
+│   │   ├── apps.py        # 应用管理
+│   │   ├── system.py      # 电池、剪贴板、通知、系统设置
+│   │   └── files.py       # 文件读写/列表/删除
+│   ├── tools/             # MCP 工具层（对 bridge 的薄封装）
+│   │   ├── decorators.py  # @bridge_call 错误处理装饰器
+│   │   ├── device.py      # 健康、信息、电池、截图、UI 层级
 │   │   ├── input.py       # 触控、滑动、按键
 │   │   ├── apps.py        # 应用管理
 │   │   ├── system.py      # Shell、设置、剪贴板
@@ -277,12 +293,16 @@ android-mcp/
 │   │   │   │   ├── HttpServer.kt  # 内嵌 HTTP 服务器 (:18080)
 │   │   │   │   └── Router.kt      # JSON-RPC 方法路由
 │   │   │   └── util/
-│   │   │       └── ShizukuHelper.kt # Shizuku binder 封装
+│   │   │       ├── ShizukuHelper.kt # Shizuku binder 封装
+│   │   │       └── TokenStore.kt    # 桥接鉴权 Token（生成 + 持久化）
 │   │   └── res/                   # 布局、图标、字符串资源
 │   ├── gradle/                    # Gradle 构建系统
 │   ├── build.gradle.kts
 │   └── settings.gradle.kts
 ├── scripts/setup.sh       # 首次配置脚本
+├── tests/                 # 测试脚本
+│   ├── test_adb.py        # ADB 桥接测试
+│   └── test_all.py        # 端到端测试
 ├── start.sh               # 一键启动脚本
 ├── start.bat              # Windows 启动脚本
 ├── pyproject.toml

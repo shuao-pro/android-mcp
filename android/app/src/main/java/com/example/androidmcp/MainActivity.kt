@@ -14,6 +14,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.androidmcp.util.ShizukuHelper
+import com.example.androidmcp.util.TokenStore
 import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : AppCompatActivity() {
@@ -27,6 +28,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnRefresh: Button
     private lateinit var layoutAuthButtons: View
     private lateinit var tvLog: TextView
+    private lateinit var tvToken: TextView
 
     private val logLines = mutableListOf<String>()
     private val isServiceRunning = AtomicBoolean(false)
@@ -44,6 +46,10 @@ class MainActivity : AppCompatActivity() {
         btnRefresh = findViewById(R.id.btnRefresh)
         layoutAuthButtons = findViewById(R.id.layoutAuthButtons)
         tvLog = findViewById(R.id.tvLog)
+        tvToken = findViewById(R.id.tvToken)
+
+        tvToken.text = TokenStore.getOrCreate(this)
+        tvToken.setOnClickListener { copyTokenToClipboard() }
 
         ShizukuHelper.onStatusChanged = {
             runOnUiThread { updateUI() }
@@ -217,6 +223,17 @@ class MainActivity : AppCompatActivity() {
 
         layoutAuthButtons.visibility = if (!verified) View.VISIBLE else View.GONE
         btnAuth.text = if (available) "前往授权" else "打开 Shizuku"
+    }
+
+    private fun copyTokenToClipboard() {
+        val token = TokenStore.getOrCreate(this)
+        val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+            as android.content.ClipboardManager
+        clipboard.setPrimaryClip(
+            android.content.ClipData.newPlainText("Android MCP Token", token)
+        )
+        tvToken.text = token
+        appendLog("Token 已复制到剪贴板")
     }
 
     private fun appendLog(message: String) {

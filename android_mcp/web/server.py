@@ -83,6 +83,7 @@ async def api_setup_status():
         "adb_device_list": [],
         "android_service": False,
         "android_service_detail": {},
+        "token_configured": bool(config.ANDROID_TOKEN),
         "dotenv_exists": False,
         "dotenv_path": _os.path.join(project_root, ".env"),
         "vision_configured": False,
@@ -140,7 +141,7 @@ async def api_setup_status():
         except Exception:
             pass
 
-    # Android MCP service (Shizuku, port 18080) 闂?fast-fail in 2s
+    # Android MCP service (Shizuku, port 18080) — fast-fail in 2s
     try:
         health = await asyncio.wait_for(bridge.health_check(), timeout=2.0)
     except asyncio.TimeoutError:
@@ -152,6 +153,7 @@ async def api_setup_status():
         "shizuku_running": health.get("shizuku_running", False),
         "device_name": "",
         "android_version": "",
+        "error": health.get("error", ""),
     }
 
     if health.get("connected"):

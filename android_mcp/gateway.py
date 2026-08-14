@@ -1,4 +1,4 @@
-"""Android MCP Server 鈥?CLI process manager (start/stop/status/restart/forward)."""
+"""Android MCP Server — CLI process manager (start/stop/status/restart/forward)."""
 
 import signal
 import os
@@ -6,6 +6,20 @@ import sys
 import subprocess
 import time
 import argparse
+
+from android_mcp.console import (
+    BLUE,
+    BOLD,
+    GREEN,
+    RED,
+    RESET,
+    YELLOW,
+    err,
+    info,
+    ok,
+    setup_utf8,
+    warn,
+)
 
 # ========== PID management ==========
 
@@ -28,15 +42,47 @@ def read_pid(name: str) -> int | None:
         return None
 
 
+def _pid_exists(pid: int) -> bool:
+    """Check whether a PID is alive, cross-platform.
+
+    os.kill(pid, 0) is NOT a reliable liveness check on Windows: signal 0 maps
+    to GenerateConsoleCtrlEvent(CTRL_C_EVENT, pid), which raises WinError 87 for
+    any pid outside the current console group — dead or alive. Use psutil when
+    available, falling back to OpenProcess on Windows and os.kill(0) on POSIX.
+    """
+    try:
+        import psutil
+    except ImportError:
+        psutil = None
+
+    if psutil is not None:
+        return psutil.pid_exists(pid)
+
+    if os.name == "nt":
+        import ctypes
+
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        if handle:
+            kernel32.CloseHandle(handle)
+            return True
+        return False
+
+    try:
+        os.kill(pid, 0)
+        return True
+    except PermissionError:
+        return True  # process exists but isn't ours to signal
+    except (ProcessLookupError, OSError):
+        return False
+
+
 def is_running(name: str) -> bool:
     pid = read_pid(name)
     if pid is None:
         return False
-    try:
-        os.kill(pid, 0)
-        return True
-    except (ProcessLookupError, PermissionError):
-        return False
+    return _pid_exists(pid)
 
 
 def cleanup_pid(name: str) -> None:
@@ -47,35 +93,23 @@ def cleanup_pid(name: str) -> None:
         pass
 
 
-# ========== Colored output ==========
-
-GREEN = "\033[92m"
-RED = "\033[91m"
-YELLOW = "\033[93m"
-BLUE = "\033[94m"
-BOLD = "\033[1m"
-RESET = "\033[0m"
-
-
-def ok(msg: str) -> None:
-    print(f"{GREEN}{msg}{RESET}")
-
-
-def err(msg: str) -> None:
-    print(f"{RED}{msg}{RESET}")
-
-
-def warn(msg: str) -> None:
-    print(f"{YELLOW}{msg}{RESET}")
-
-
-def info(msg: str) -> None:
-    print(f"{BLUE}{msg}{RESET}")
-
-
 # ========== Command handlers ==========
 
 WEB_URL = "http://127.0.0.1:8080"
+
+
+def _show_log(title: str, path: str) -> None:
+    """Print the current tail of a service log file (or a placeholder)."""
+    info(f"{BOLD}── {title} ──{RESET}")
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            text = f.read()
+    except FileNotFoundError:
+        text = ""
+    if text.strip():
+        print(text, end=("" if text.endswith("\n") else "\n"))
+    else:
+        info("  (no output yet)")
 
 
 def cmd_start() -> None:
@@ -88,24 +122,45 @@ def cmd_start() -> None:
         warn("Web GUI is already running")
         return
 
+    # Write service output to log files (visible + inspectable) instead of
+    # DEVNULL, so startup banners and errors aren't swallowed.
+    mcp_log_path = os.path.join(PID_DIR, "mcp.log")
+    web_log_path = os.path.join(PID_DIR, "web.log")
+    mcp_log = open(mcp_log_path, "a", encoding="utf-8")
+    web_log = open(web_log_path, "a", encoding="utf-8")
+
+    # --mode mcp is stdio-only (no listening port) and dies immediately when
+    # detached. Use mcp-sse so the MCP server actually listens on MCP_PORT.
+    # -u keeps stdout/stderr unbuffered so startup output reaches the log file
+    # before the tail below runs.
     mcp_proc = subprocess.Popen(
-        [sys.executable, "-m", "android_mcp.main", "--mode", "mcp"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        [sys.executable, "-u", "-m", "android_mcp.main", "--mode", "mcp-sse"],
+        stdout=mcp_log,
+        stderr=subprocess.STDOUT,
     )
     write_pid("mcp", mcp_proc.pid)
 
     web_proc = subprocess.Popen(
-        [sys.executable, "-m", "android_mcp.main", "--mode", "web"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        [sys.executable, "-u", "-m", "android_mcp.main", "--mode", "web"],
+        stdout=web_log,
+        stderr=subprocess.STDOUT,
     )
     write_pid("web", web_proc.pid)
+
+    # Parent no longer needs these handles; the children keep their own.
+    mcp_log.close()
+    web_log.close()
 
     ok("Services started")
     info(f"  MCP Server PID: {mcp_proc.pid}")
     info(f"  Web GUI    PID: {web_proc.pid}")
     info(f"  Web GUI   URL: {WEB_URL}")
+    info(f"  Logs: {mcp_log_path} / {web_log_path}")
+
+    # Surface the startup output so it's visible immediately.
+    time.sleep(2)
+    _show_log("MCP Server", mcp_log_path)
+    _show_log("Web GUI", web_log_path)
 
 
 def _stop_service(name: str) -> None:
@@ -122,9 +177,7 @@ def _stop_service(name: str) -> None:
 
     for _ in range(10):
         time.sleep(0.5)
-        try:
-            os.kill(pid, 0)
-        except ProcessLookupError:
+        if not _pid_exists(pid):
             cleanup_pid(name)
             ok(f"{display_name} stopped")
             return
@@ -228,6 +281,7 @@ def cmd_forward() -> None:
 
 
 def main() -> None:
+    setup_utf8()
     parser = argparse.ArgumentParser(
         prog="android-mcp-gateway",
         description="Android MCP Server management tool",

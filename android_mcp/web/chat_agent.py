@@ -187,7 +187,7 @@ def _get_llm_client():
     if provider == "anthropic":
         return AnthropicVisionClient(
             api_key=config.VISION_API_KEY,
-            model=model or "claude-sonnet-5-20251001",
+            model=model or "claude-sonnet-5",
         )
     elif provider == "openai":
         return OpenAIVisionClient(
