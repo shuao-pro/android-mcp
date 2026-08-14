@@ -398,11 +398,18 @@ function toast(msg){
 }
 
 // ===== Setup Wizard =====
+var setupSyncTimer = null, setupChecking = false;
 function openSetup(){
   document.getElementById('setupModal').classList.add('show');
   checkSetup();
+  // Auto-sync the check status while the wizard is open so the connection
+  // state stays live (e.g. user connects the device after opening the wizard).
+  if(!setupSyncTimer) setupSyncTimer = setInterval(checkSetup, 3000);
 }
-function closeSetup(){ document.getElementById('setupModal').classList.remove('show'); }
+function closeSetup(){
+  document.getElementById('setupModal').classList.remove('show');
+  if(setupSyncTimer){ clearInterval(setupSyncTimer); setupSyncTimer = null; }
+}
 function setupServiceDetail(r){
   var d = r.android_service_detail || {};
   if (d.device_name) return d.device_name + (d.android_version ? ' (Android ' + d.android_version + ')' : '');
@@ -410,8 +417,14 @@ function setupServiceDetail(r){
   return 'Port 18080';
 }
 function checkSetup(){
+  if(setupChecking) return;
+  setupChecking = true;
   var steps = document.getElementById('wizSteps');
-  steps.innerHTML = '<div class="wiz-step"><div class="wiz-content"><div class="wiz-title">Checking...</div></div></div>';
+  // Only show the placeholder on first load; afterwards update in place so the
+  // auto-sync doesn't flash the list on every poll.
+  if(!steps.dataset.loaded){
+    steps.innerHTML = '<div class="wiz-step"><div class="wiz-content"><div class="wiz-title">Checking...</div></div></div>';
+  }
   fetch('/api/setup/status').then(function(r){ return r.json(); }).then(function(r){
     var items = [
       {key:'adb_installed',title:'ADB',desc:'Android SDK Platform Tools',detail:r.adb_path||'Not found',pass:r.adb_installed},
@@ -422,6 +435,7 @@ function checkSetup(){
       {key:'vision_configured',title:'AI Vision API',desc:'Claude/GPT-4o for element recognition',detail:r.vision_provider||'Not set',pass:r.vision_configured,optional:true}
     ];
     var passCount = 0, failCount = 0;
+    steps.dataset.loaded = '1';
     steps.innerHTML = items.map(function(it,i){
       var cls = it.pass ? 'pass' : 'fail';
       if(it.pass) passCount++; else if(!it.optional) failCount++;
@@ -432,10 +446,12 @@ function checkSetup(){
         '<div class="wiz-status '+cls+'">'+(it.pass?'OK':'Fail')+'</div></div>';
     }).join('');
     var sm = document.getElementById('setupSummary');
-    sm.textContent = passCount+'/'+items.length+' checks passed';
-    sm.className = failCount > 0 ? '' : '';
+    sm.textContent = passCount+'/'+items.length+' checks passed · auto-sync';
+    setupChecking = false;
   }).catch(function(e){
+    steps.dataset.loaded = '1';
     steps.innerHTML = '<div class="wiz-step fail"><div class="wiz-content"><div class="wiz-title">Error</div><div class="wiz-desc">'+escHtml(e.message)+'</div></div></div>';
+    setupChecking = false;
   });
 }
 
