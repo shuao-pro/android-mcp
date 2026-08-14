@@ -246,13 +246,23 @@ python -m android_mcp.gateway forward       # ADB 端口转发
 ```
 android-mcp/
 ├── android_mcp/
-│   ├── server.py          # FastMCP 服务定义
-│   ├── main.py            # 入口
-│   ├── config.py          # 环境配置
-│   ├── bridge.py          # Android HTTP 桥接
+│   ├── server.py          # FastMCP 服务定义（工具注册）
+│   ├── main.py            # 入口（模式分发）
+│   ├── config.py          # 环境配置（.env 加载）
+│   ├── console.py         # 彩色控制台输出
+│   ├── utils.py           # 局域网 IP + 版本工具
 │   ├── gateway.py         # CLI 进程管理
-│   ├── tools/             # MCP 工具实现（按领域拆分）
-│   │   ├── device.py      # 健康检查、设备信息、截图
+│   ├── bridge/            # 底层 Android HTTP 桥接
+│   │   ├── __init__.py    # 重新导出所有桥接函数
+│   │   ├── _core.py       # JSON-RPC 传输 + ADB 转发
+│   │   ├── device.py      # 健康、信息、截图、Shell、重启
+│   │   ├── input.py       # 点击、滑动、拖拽、按键、输入
+│   │   ├── apps.py        # 应用管理
+│   │   ├── system.py      # 电池、剪贴板、通知、系统设置
+│   │   └── files.py       # 文件读写/列表/删除
+│   ├── tools/             # MCP 工具层（对 bridge 的薄封装）
+│   │   ├── decorators.py  # @bridge_call 错误处理装饰器
+│   │   ├── device.py      # 健康、信息、电池、截图、UI 层级
 │   │   ├── input.py       # 触控、滑动、按键
 │   │   ├── apps.py        # 应用管理
 │   │   ├── system.py      # Shell、设置、剪贴板
@@ -290,6 +300,9 @@ android-mcp/
 │   ├── build.gradle.kts
 │   └── settings.gradle.kts
 ├── scripts/setup.sh       # 首次配置脚本
+├── tests/                 # 测试脚本
+│   ├── test_adb.py        # ADB 桥接测试
+│   └── test_all.py        # 端到端测试
 ├── start.sh               # 一键启动脚本
 ├── start.bat              # Windows 启动脚本
 ├── pyproject.toml
