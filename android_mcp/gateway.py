@@ -156,6 +156,7 @@ def cmd_start() -> None:
     info(f"  Web GUI    PID: {web_proc.pid}")
     info(f"  Web GUI   URL: {WEB_URL}")
     info(f"  Logs: {mcp_log_path} / {web_log_path}")
+    info(f"  Follow: python -m android_mcp.gateway logs")
 
     # Surface the startup output so it's visible immediately.
     time.sleep(2)
@@ -277,6 +278,49 @@ def cmd_forward() -> None:
         err(f"ADB port forward failed: {result.stderr.strip()}")
 
 
+def cmd_logs() -> None:
+    """Tail MCP and Web GUI logs in real time (Ctrl+C to stop)."""
+    logs = [
+        ("MCP Server", os.path.join(PID_DIR, "mcp.log")),
+        ("Web GUI", os.path.join(PID_DIR, "web.log")),
+    ]
+
+    # Print existing content first, then follow appends.
+    offsets: dict[str, int] = {}
+    for name, path in logs:
+        info(f"{BOLD}── {name} ({path}) ──{RESET}")
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                text = f.read()
+                if text.strip():
+                    print(text, end=("" if text.endswith("\n") else "\n"))
+            offsets[path] = os.path.getsize(path)
+        except FileNotFoundError:
+            info("  (no log yet — run 'start' first)")
+            offsets[path] = 0
+
+    info(f"{BOLD}── following logs (Ctrl+C to stop) ──{RESET}")
+    try:
+        while True:
+            time.sleep(1)
+            for _, path in logs:
+                try:
+                    size = os.path.getsize(path)
+                except FileNotFoundError:
+                    continue
+                start = offsets.get(path, 0)
+                if size < start:  # file was truncated/rotated
+                    start = 0
+                if size > start:
+                    with open(path, "r", encoding="utf-8", errors="replace") as f:
+                        f.seek(start)
+                        print(f.read(), end="")
+                    offsets[path] = size
+    except KeyboardInterrupt:
+        print()
+        info("Stopped following logs.")
+
+
 # ========== CLI ==========
 
 
@@ -295,6 +339,7 @@ def main() -> None:
     subparsers.add_parser(
         "forward", help="Set up ADB port forward (tcp:18080 -> tcp:18080)"
     )
+    subparsers.add_parser("logs", help="Tail MCP and Web GUI logs in real time")
 
     args = parser.parse_args()
 
@@ -308,6 +353,7 @@ def main() -> None:
         "status": cmd_status,
         "restart": cmd_restart,
         "forward": cmd_forward,
+        "logs": cmd_logs,
     }
 
     handlers[args.command]()
