@@ -426,13 +426,14 @@ function checkSetup(){
     steps.innerHTML = '<div class="wiz-step"><div class="wiz-content"><div class="wiz-title">Checking...</div></div></div>';
   }
   fetch('/api/setup/status').then(function(r){ return r.json(); }).then(function(r){
+    var d = r.data || r;  // /api/setup/status wraps the payload under "data"
     var items = [
-      {key:'adb_installed',title:'ADB',desc:'Android SDK Platform Tools',detail:r.adb_path||'Not found',pass:r.adb_installed},
-      {key:'adb_device',title:'Device',desc:'USB or wireless ADB',detail:r.adb_device_info||(r.adb_device_list&&r.adb_device_list.length)+' device(s)',pass:r.adb_device},
-      {key:'token_configured',title:'Auth Token',desc:'Bridge token in .env (copy from phone app)',detail:r.token_configured?'Configured':'Not set',pass:r.token_configured},
-      {key:'android_service',title:'Android MCP Service',desc:'Start Shizuku + Android MCP on phone',detail:setupServiceDetail(r),pass:r.android_service},
-      {key:'dotenv_exists',title:'.env Config',desc:'Environment file',detail:r.dotenv_path,pass:r.dotenv_exists},
-      {key:'vision_configured',title:'AI Vision API',desc:'Claude/GPT-4o for element recognition',detail:r.vision_provider||'Not set',pass:r.vision_configured,optional:true}
+      {key:'adb_installed',title:'ADB',desc:'Android SDK Platform Tools',detail:d.adb_path||'Not found',pass:d.adb_installed},
+      {key:'adb_device',title:'Device',desc:'USB or wireless ADB',detail:d.adb_device_info||(d.adb_device_list&&d.adb_device_list.length)+' device(s)',pass:d.adb_device},
+      {key:'token_configured',title:'Auth Token',desc:'Bridge token in .env (copy from phone app)',detail:d.token_configured?'Configured':'Not set',pass:d.token_configured},
+      {key:'android_service',title:'Android MCP Service',desc:'Start Shizuku + Android MCP on phone',detail:setupServiceDetail(d),pass:d.android_service},
+      {key:'dotenv_exists',title:'.env Config',desc:'Environment file',detail:d.dotenv_path,pass:d.dotenv_exists},
+      {key:'vision_configured',title:'AI Vision API',desc:'Claude/GPT-4o for element recognition',detail:d.vision_provider||'Not set',pass:d.vision_configured,optional:true}
     ];
     var passCount = 0, failCount = 0;
     steps.dataset.loaded = '1';
@@ -518,11 +519,13 @@ function saveAllSettings(e){
 function refreshAdbDevices(){
   var el = document.getElementById('adbDeviceList');
   fetch('/api/adb/devices').then(function(r){ return r.json(); }).then(function(r){
-    if(!r.devices || !r.devices.length){ el.innerHTML = '<span class="text-muted">No devices</span>'; return; }
-    el.innerHTML = r.devices.map(function(d){
-      return '<div class="adb-device"><span class="adb-device-dot '+d.status+'"></span>'+
-        '<div class="adb-device-info"><span class="adb-device-id">'+escHtml(d.id)+'</span>'+
-        '<span class="adb-device-model">'+escHtml(d.model||'')+'</span></div></div>';
+    var payload = r.data || r;  // /api/adb/devices wraps the list under "data"
+    var devices = payload.devices || [];
+    if(!devices.length){ el.innerHTML = '<span class="text-muted">No devices</span>'; return; }
+    el.innerHTML = devices.map(function(dev){
+      return '<div class="adb-device"><span class="adb-device-dot '+dev.status+'"></span>'+
+        '<div class="adb-device-info"><span class="adb-device-id">'+escHtml(dev.id)+'</span>'+
+        '<span class="adb-device-model">'+escHtml(dev.model||'')+'</span></div></div>';
     }).join('');
   }).catch(function(){ el.innerHTML = '<span class="text-muted">Error</span>'; });
 }
