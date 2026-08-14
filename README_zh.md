@@ -20,24 +20,83 @@
 
 ## 🏗️ 架构
 
+三个层级协同工作，把自然语言请求转化为设备上的系统级操作：
+
 ```mermaid
-flowchart LR
-    A["🤖 MCP 客户端<br/>Claude / Kai 9000 / Cherry"]
-    B["🐍 Python 服务器<br/>FastMCP + Web GUI :8080"]
-    C["📱 Android 设备<br/>Shizuku App :18080"]
+flowchart TB
+    subgraph CLIENTS["🤖 MCP 客户端"]
+        C1["Claude Desktop<br/>stdio / SSE"]
+        C2["Kai 9000<br/>Streamable HTTP"]
+        C3["Cherry Studio<br/>Streamable HTTP"]
+        C4["Web 控制台<br/>浏览器 · :8080"]
+    end
 
-    A <-->|"SSE / stdio / HTTP<br/>:9000"| B
-    B <-->|"JSON-RPC + Token 鉴权<br/>ADB 隧道"| C
+    subgraph SERVER["🐍 Python 服务器 · android_mcp/"]
+        S1["FastMCP<br/>29 个工具 · :9000<br/>/sse + /mcp"]
+        S2["Web GUI · FastAPI<br/>:8080 · WebSocket"]
+        S3["tools/<br/>薄封装层"]
+        S4["bridge/<br/>JSON-RPC 传输层"]
+        S5["vision/<br/>AI 元素定位"]
+        S1 --- S3
+        S3 --- S4
+        S2 --- S4
+        S2 --- S5
+    end
 
-    B -.->|"视觉 API"| D["🧠 AI 视觉<br/>Claude / GPT-4o"]
-    C -.->|"UID 2000"| E["⚡ 系统 API<br/>Shell / 触控 / 文件"]
+    subgraph PHONE["📱 Android 应用 · Kotlin + Shizuku"]
+        P1["HttpServer<br/>:18080"]
+        P2["Router<br/>JSON-RPC 分发"]
+        P3["api/<br/>shell · input · file · system"]
+        P4["Shizuku<br/>UID 2000"]
+        P1 --- P2
+        P2 --- P3
+        P3 --- P4
+    end
+
+    C1 --> S1
+    C2 --> S1
+    C3 --> S1
+    C4 --> S2
+    S4 -->|"HTTP JSON-RPC · X-MCP-Token<br/>ADB 转发 tcp:18080"| P1
+    S5 -.->|"Claude Vision / GPT-4o"| V["🧠 视觉 API"]
 ```
 
-| 层级 | 角色 | 关键技术 |
-|------|------|----------|
-| 🤖 **MCP 客户端** | AI 助手通过 MCP 连接 | Claude Desktop、Kai 9000、Cherry Studio |
-| 🐍 **Python 服务器** | 工具注册、Web GUI、AI 聊天代理 | FastMCP + FastAPI + WebSocket |
-| 📱 **Android 应用** | 设备端系统级执行 | Shizuku (UID 2000)、HTTP JSON-RPC |
+### 组件说明
+
+| 层级 | 组件 | 职责 | 关键技术 |
+|------|------|------|----------|
+| **客户端** | Claude Desktop / Kai 9000 / Cherry Studio | 通过 MCP 发送工具调用 | stdio、SSE、Streamable HTTP |
+| | Web 控制台 | 浏览器面板、实时画面、AI 对话 | FastAPI + WebSocket |
+| **Python 服务器** | `server.py`（FastMCP） | 注册 29 个工具，处理 MCP 协议 | FastMCP |
+| | `bridge/` | 发送 JSON-RPC 到设备，自动 ADB 转发 | httpx、JSON-RPC 2.0 |
+| | `tools/` | 对 `bridge/` 的 `@bridge_call` 薄封装 | 装饰器 |
+| | `web/` | 控制台 API、聊天、scrcpy 推流 | FastAPI、uvicorn |
+| | `vision/` | AI 屏幕元素识别 | Claude Vision / GPT-4o |
+| **Android 应用** | `HttpServer` | 内嵌 HTTP 服务器 :18080，token 鉴权 | Java `ServerSocket` |
+| | `Router` | JSON-RPC 方法分发 | JSON-RPC 2.0 |
+| | `api/*` | Shell、触控、应用、文件、系统操作 | Shizuku API |
+| | `util/` | Shizuku binder 封装 + token 存储 | `ShizukuHelper`、`TokenStore` |
+
+### 请求生命周期
+
+每个工具调用都走同一条链路 —— 以 `click(x, y)` 为例：
+
+1. **客户端** 通过 MCP（`:9000`）或 Web 控制台（`:8080`）发送 `click(x, y)`。
+2. **FastMCP / FastAPI** 将其路由到 `tools/` 中对应的封装函数。
+3. **`bridge/_core.py`** 序列化为 JSON-RPC 2.0 请求，附带 `X-MCP-Token` 头，POST 到 `http://127.0.0.1:18080/mcp`（必要时自动重建 ADB 转发）。
+4. **`HttpServer`** 校验 token 后，交给 `Router`。
+5. **`Router`** 分发到对应的 `api/*` 模块（如 `InputApi.tap`），通过 **Shizuku**（UID 2000）执行 —— 无需 root。
+6. JSON-RPC 结果沿原链路返回给调用方。
+
+### 端口与传输
+
+| 端口 | 服务 | 传输方式 | 使用者 |
+|------|------|----------|--------|
+| `:9000/sse` | MCP（SSE） | HTTP SSE | Claude Desktop（远程）、Web 前端 |
+| `:9000/mcp` | MCP（Streamable HTTP） | HTTP POST/GET | Kai 9000、Cherry Studio |
+| `:8080` | Web 控制台 | HTTP + WebSocket | 浏览器 |
+| `:18080` | Android 桥接 | HTTP JSON-RPC（ADB 转发） | Python `bridge/` |
+| *(stdio)* | MCP（stdio） | 本地管道 | Claude Desktop（本地） |
 
 > 🔒 **通信鉴权**：Python 网关 ↔ Android 应用通过共享 `X-MCP-Token` 统一鉴权。App 随机生成 token 并显示在界面，复制到 `.env` 的 `ANDROID_TOKEN=` 即可。默认 `MCP_HOST=127.0.0.1`（仅本机访问）。
 

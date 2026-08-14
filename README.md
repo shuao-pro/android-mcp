@@ -21,24 +21,83 @@ Control an Android phone with natural language — through Claude Desktop, Cherr
 
 ## 🏗️ Architecture
 
+Three layers cooperate to turn a natural-language request into system-level actions on the device:
+
 ```mermaid
-flowchart LR
-    A["🤖 MCP Client<br/>Claude / Kai 9000 / Cherry"]
-    B["🐍 Python Server<br/>FastMCP + Web GUI :8080"]
-    C["📱 Android Device<br/>Shizuku App :18080"]
+flowchart TB
+    subgraph CLIENTS["🤖 MCP Clients"]
+        C1["Claude Desktop<br/>stdio / SSE"]
+        C2["Kai 9000<br/>Streamable HTTP"]
+        C3["Cherry Studio<br/>Streamable HTTP"]
+        C4["Web Dashboard<br/>browser · :8080"]
+    end
 
-    A <-->|"SSE / stdio / HTTP<br/>:9000"| B
-    B <-->|"JSON-RPC + token auth<br/>ADB tunnel"| C
+    subgraph SERVER["🐍 Python Server · android_mcp/"]
+        S1["FastMCP<br/>29 tools · :9000<br/>/sse + /mcp"]
+        S2["Web GUI · FastAPI<br/>:8080 · WebSocket"]
+        S3["tools/<br/>thin wrappers"]
+        S4["bridge/<br/>JSON-RPC transport"]
+        S5["vision/<br/>AI element locator"]
+        S1 --- S3
+        S3 --- S4
+        S2 --- S4
+        S2 --- S5
+    end
 
-    B -.->|"Vision API"| D["🧠 AI Vision<br/>Claude / GPT-4o"]
-    C -.->|"UID 2000"| E["⚡ System APIs<br/>Shell / Input / Files"]
+    subgraph PHONE["📱 Android App · Kotlin + Shizuku"]
+        P1["HttpServer<br/>:18080"]
+        P2["Router<br/>JSON-RPC dispatch"]
+        P3["api/<br/>shell · input · file · system"]
+        P4["Shizuku<br/>UID 2000"]
+        P1 --- P2
+        P2 --- P3
+        P3 --- P4
+    end
+
+    C1 --> S1
+    C2 --> S1
+    C3 --> S1
+    C4 --> S2
+    S4 -->|"HTTP JSON-RPC · X-MCP-Token<br/>ADB forward tcp:18080"| P1
+    S5 -.->|"Claude Vision / GPT-4o"| V["🧠 Vision API"]
 ```
 
-| Layer | Role | Key Tech |
-|-------|------|----------|
-| 🤖 **MCP Client** | AI assistant connects via MCP | Claude Desktop, Kai 9000, Cherry Studio |
-| 🐍 **Python Server** | Tool registry, Web GUI, AI chat agent | FastMCP + FastAPI + WebSocket |
-| 📱 **Android App** | System-level execution on device | Shizuku (UID 2000), HTTP JSON-RPC |
+### Component breakdown
+
+| Layer | Component | Responsibility | Key tech |
+|-------|-----------|----------------|----------|
+| **Clients** | Claude Desktop / Kai 9000 / Cherry Studio | Send tool calls as MCP messages | stdio, SSE, Streamable HTTP |
+| | Web Dashboard | Browser panel, live screen, AI chat | FastAPI + WebSocket |
+| **Python server** | `server.py` (FastMCP) | Registers 29 tools, speaks MCP | FastMCP |
+| | `bridge/` | JSON-RPC → device, auto ADB forward | httpx, JSON-RPC 2.0 |
+| | `tools/` | Thin `@bridge_call` wrappers | decorators |
+| | `web/` | Dashboard API, chat, scrcpy stream | FastAPI, uvicorn |
+| | `vision/` | AI screen-element recognition | Claude Vision / GPT-4o |
+| **Android app** | `HttpServer` | Embedded HTTP server :18080, token auth | Java `ServerSocket` |
+| | `Router` | JSON-RPC method dispatch | JSON-RPC 2.0 |
+| | `api/*` | Shell, input, package, file, system | Shizuku API |
+| | `util/` | Shizuku binder wrapper + token store | `ShizukuHelper`, `TokenStore` |
+
+### Request lifecycle
+
+Every tool call follows one path — e.g. `click(x, y)`:
+
+1. **Client** sends `click(x, y)` over MCP (`:9000`) or the Web Dashboard (`:8080`).
+2. **FastMCP / FastAPI** routes it to the matching `tools/` wrapper.
+3. **`bridge/_core.py`** serializes it as a JSON-RPC 2.0 request, attaches the `X-MCP-Token` header, and POSTs to `http://127.0.0.1:18080/mcp` (re-establishing the ADB forward if needed).
+4. **`HttpServer`** authenticates the token, then hands the request to `Router`.
+5. **`Router`** dispatches to the right `api/*` module (e.g. `InputApi.tap`), which runs it via **Shizuku** (UID 2000) — no root required.
+6. The JSON-RPC result travels back up the same chain.
+
+### Ports & transports
+
+| Port | Service | Transport | Consumers |
+|------|---------|-----------|-----------|
+| `:9000/sse` | MCP (SSE) | HTTP SSE | Claude Desktop (remote), web frontends |
+| `:9000/mcp` | MCP (Streamable HTTP) | HTTP POST/GET | Kai 9000, Cherry Studio |
+| `:8080` | Web Dashboard | HTTP + WebSocket | Browser |
+| `:18080` | Android bridge | HTTP JSON-RPC (ADB-forwarded) | Python `bridge/` |
+| *(stdio)* | MCP (stdio) | local pipe | Claude Desktop (local) |
 
 > 💡 The server can run on the phone itself (Termux / Kai 9000). Set `ANDROID_HOST=127.0.0.1` — no ADB needed.
 ## ✨ Features
