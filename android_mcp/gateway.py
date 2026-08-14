@@ -49,7 +49,11 @@ def is_running(name: str) -> bool:
     try:
         os.kill(pid, 0)
         return True
-    except (ProcessLookupError, PermissionError):
+    except PermissionError:
+        return True  # process exists but isn't ours to signal
+    except OSError:
+        # POSIX raises ProcessLookupError; Windows raises WinError 87 for a
+        # dead pid. Both mean the process is gone.
         return False
 
 

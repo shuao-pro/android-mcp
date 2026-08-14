@@ -78,7 +78,7 @@ function updateClock(){
 
 // ===== WebSocket /ws =====
 function connectWS(){
-  if(ws && ws.readyState === WebSocket.OPEN) return;
+  if(ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
   var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   ws = new WebSocket(proto + '//' + location.host + '/ws');
   ws.onopen = function(){
@@ -87,6 +87,7 @@ function connectWS(){
   ws.onclose = function(){
     document.getElementById('statusDot').classList.remove('online');
     document.getElementById('statusLabel').textContent = t('disconnected');
+    if(wsReconnectTimer) clearTimeout(wsReconnectTimer);
     wsReconnectTimer = setTimeout(connectWS, 3000);
   };
   ws.onmessage = handleWS;
