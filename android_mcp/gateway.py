@@ -98,6 +98,20 @@ def cleanup_pid(name: str) -> None:
 WEB_URL = "http://127.0.0.1:8080"
 
 
+def _show_log(title: str, path: str) -> None:
+    """Print the current tail of a service log file (or a placeholder)."""
+    info(f"{BOLD}── {title} ──{RESET}")
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            text = f.read()
+    except FileNotFoundError:
+        text = ""
+    if text.strip():
+        print(text, end=("" if text.endswith("\n") else "\n"))
+    else:
+        info("  (no output yet)")
+
+
 def cmd_start() -> None:
     """Start MCP and Web GUI services."""
     if is_running("mcp"):
@@ -108,26 +122,45 @@ def cmd_start() -> None:
         warn("Web GUI is already running")
         return
 
+    # Write service output to log files (visible + inspectable) instead of
+    # DEVNULL, so startup banners and errors aren't swallowed.
+    mcp_log_path = os.path.join(PID_DIR, "mcp.log")
+    web_log_path = os.path.join(PID_DIR, "web.log")
+    mcp_log = open(mcp_log_path, "a", encoding="utf-8")
+    web_log = open(web_log_path, "a", encoding="utf-8")
+
     # --mode mcp is stdio-only (no listening port) and dies immediately when
     # detached. Use mcp-sse so the MCP server actually listens on MCP_PORT.
+    # -u keeps stdout/stderr unbuffered so startup output reaches the log file
+    # before the tail below runs.
     mcp_proc = subprocess.Popen(
-        [sys.executable, "-m", "android_mcp.main", "--mode", "mcp-sse"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        [sys.executable, "-u", "-m", "android_mcp.main", "--mode", "mcp-sse"],
+        stdout=mcp_log,
+        stderr=subprocess.STDOUT,
     )
     write_pid("mcp", mcp_proc.pid)
 
     web_proc = subprocess.Popen(
-        [sys.executable, "-m", "android_mcp.main", "--mode", "web"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        [sys.executable, "-u", "-m", "android_mcp.main", "--mode", "web"],
+        stdout=web_log,
+        stderr=subprocess.STDOUT,
     )
     write_pid("web", web_proc.pid)
+
+    # Parent no longer needs these handles; the children keep their own.
+    mcp_log.close()
+    web_log.close()
 
     ok("Services started")
     info(f"  MCP Server PID: {mcp_proc.pid}")
     info(f"  Web GUI    PID: {web_proc.pid}")
     info(f"  Web GUI   URL: {WEB_URL}")
+    info(f"  Logs: {mcp_log_path} / {web_log_path}")
+
+    # Surface the startup output so it's visible immediately.
+    time.sleep(2)
+    _show_log("MCP Server", mcp_log_path)
+    _show_log("Web GUI", web_log_path)
 
 
 def _stop_service(name: str) -> None:
