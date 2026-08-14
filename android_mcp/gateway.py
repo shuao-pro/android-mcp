@@ -7,6 +7,7 @@ import subprocess
 import time
 import argparse
 
+from android_mcp.config import config
 from android_mcp.console import (
     BLUE,
     BOLD,
@@ -78,11 +79,37 @@ def _pid_exists(pid: int) -> bool:
         return False
 
 
+def _port_in_use(port: int) -> bool:
+    """Return True if something is listening on the given TCP port."""
+    import socket
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.5)
+        try:
+            s.connect(("127.0.0.1", port))
+            return True
+        except (ConnectionRefusedError, OSError):
+            return False
+
+
+# Service registry: name -> {display, port, mode}.
+SERVICES = {
+    "mcp": {"display": "MCP Server", "port": config.MCP_PORT, "mode": "mcp-sse"},
+    "web": {"display": "Web GUI", "port": config.WEB_PORT, "mode": "web"},
+}
+
+
 def is_running(name: str) -> bool:
+    """True if the service is alive — by PID or by its listening port.
+
+    The port check is the single-instance guard: even if the PID file is stale
+    (crashed process left the file, or the PID was reused), a bound port means a
+    real instance is still serving and must not be duplicated.
+    """
     pid = read_pid(name)
-    if pid is None:
-        return False
-    return _pid_exists(pid)
+    if pid is not None and _pid_exists(pid):
+        return True
+    return _port_in_use(SERVICES[name]["port"])
 
 
 def cleanup_pid(name: str) -> None:
@@ -95,7 +122,7 @@ def cleanup_pid(name: str) -> None:
 
 # ========== Command handlers ==========
 
-WEB_URL = "http://127.0.0.1:8080"
+WEB_URL = f"http://127.0.0.1:{config.WEB_PORT}"
 
 
 def _show_log(title: str, path: str) -> None:
@@ -112,48 +139,43 @@ def _show_log(title: str, path: str) -> None:
         info("  (no output yet)")
 
 
-def cmd_start() -> None:
-    """Start MCP and Web GUI services."""
-    if is_running("mcp"):
-        warn("MCP Server is already running")
-        return
-
-    if is_running("web"):
-        warn("Web GUI is already running")
-        return
-
-    # Write service output to log files (visible + inspectable) instead of
-    # DEVNULL, so startup banners and errors aren't swallowed.
-    mcp_log_path = os.path.join(PID_DIR, "mcp.log")
-    web_log_path = os.path.join(PID_DIR, "web.log")
-    mcp_log = open(mcp_log_path, "a", encoding="utf-8")
-    web_log = open(web_log_path, "a", encoding="utf-8")
+def _start_service(name: str) -> int:
+    """Launch one service process (logging to a file), return its PID."""
+    spec = SERVICES[name]
+    log_path = os.path.join(PID_DIR, f"{name}.log")
 
     # --mode mcp is stdio-only (no listening port) and dies immediately when
-    # detached. Use mcp-sse so the MCP server actually listens on MCP_PORT.
-    # -u keeps stdout/stderr unbuffered so startup output reaches the log file
-    # before the tail below runs.
-    mcp_proc = subprocess.Popen(
-        [sys.executable, "-u", "-m", "android_mcp.main", "--mode", "mcp-sse"],
-        stdout=mcp_log,
+    # detached, so MCP uses mcp-sse. -u keeps output unbuffered so startup logs
+    # reach the file before the tail below runs.
+    log = open(log_path, "a", encoding="utf-8")
+    proc = subprocess.Popen(
+        [sys.executable, "-u", "-m", "android_mcp.main", "--mode", spec["mode"]],
+        stdout=log,
         stderr=subprocess.STDOUT,
     )
-    write_pid("mcp", mcp_proc.pid)
+    log.close()  # parent no longer needs the handle; the child keeps its own
+    write_pid(name, proc.pid)
+    return proc.pid
 
-    web_proc = subprocess.Popen(
-        [sys.executable, "-u", "-m", "android_mcp.main", "--mode", "web"],
-        stdout=web_log,
-        stderr=subprocess.STDOUT,
-    )
-    write_pid("web", web_proc.pid)
 
-    # Parent no longer needs these handles; the children keep their own.
-    mcp_log.close()
-    web_log.close()
+def cmd_start() -> None:
+    """Start MCP and Web GUI services, skipping any that are already running."""
+    started = False
+    for name in ("mcp", "web"):
+        display = SERVICES[name]["display"]
+        if is_running(name):
+            warn(f"{display} is already running")
+            continue
+        pid = _start_service(name)
+        info(f"  {display} PID: {pid} (port {SERVICES[name]['port']})")
+        started = True
 
+    if not started:
+        return
+
+    mcp_log_path = os.path.join(PID_DIR, "mcp.log")
+    web_log_path = os.path.join(PID_DIR, "web.log")
     ok("Services started")
-    info(f"  MCP Server PID: {mcp_proc.pid}")
-    info(f"  Web GUI    PID: {web_proc.pid}")
     info(f"  Web GUI   URL: {WEB_URL}")
     info(f"  Logs: {mcp_log_path} / {web_log_path}")
     info(f"  Follow: python -m android_mcp.gateway logs")
