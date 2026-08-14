@@ -49,14 +49,14 @@ var I = {
     streamClick:'\u25b6 \u70b9\u51fb\u64ad\u653e'
   }
 };
-var lang = localStorage.getItem('lang') || 'en';
-function t(k){ return (T[lang]||T.en)[k]||k; }
+function t(k){ return (I[lang]||I.en)[k]||k; }
 
 (function init(){
   applyI18n();
   connectWS();
   updateClock(); setInterval(updateClock, 30000);
-  refreshDeviceInfo();
+  refreshStatus(); setInterval(refreshStatus, 5000);
+  refreshDeviceInfo(); setInterval(refreshDeviceInfo, 10000);
 
   // Auto-show setup wizard if device not connected (once per session)
   if(!sessionStorage.getItem('setupShown')){
@@ -82,8 +82,7 @@ function connectWS(){
   var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   ws = new WebSocket(proto + '//' + location.host + '/ws');
   ws.onopen = function(){
-    document.getElementById('statusDot').classList.add('online');
-    document.getElementById('statusLabel').textContent = t('connected');
+    refreshStatus();
   };
   ws.onclose = function(){
     document.getElementById('statusDot').classList.remove('online');
@@ -122,7 +121,7 @@ function sendWS(cmd, params, cb){
 
 // ===== Device Info =====
 function refreshDeviceInfo(){
-  sendWS('get_device_info', {}, function(r){
+  sendWS('device_info', {}, function(r){
     if(!r || !r.success) return;
     var d = r.data || r;
     setVal('devModel', (d.model || d.manufacturer || '--').substring(0,20));
@@ -144,11 +143,34 @@ function setVal(id, val){
   if(el) el.textContent = val;
 }
 
+function refreshStatus(){
+  sendWS('health', {}, function(r){
+    if(!r) return;
+    var dot = document.getElementById('statusDot');
+    var label = document.getElementById('statusLabel');
+    if(r.connected){
+      dot.classList.add('online');
+      label.textContent = t('connected');
+      setVal('devShizuku', r.shizuku_running ? 'Running' : '--');
+    } else {
+      dot.classList.remove('online');
+      label.textContent = t('disconnected');
+      setVal('devShizuku', 'Off');
+    }
+  });
+}
+
 // ===== Quick Actions =====
 function quick(cmd, params){
   if(cmd === 'screenshot' || cmd === 'take_screenshot'){
-    sendWS('take_screenshot', {}, function(r){
-      toast(r && r.success ? 'Screenshot saved' : 'Failed: ' + (r&&r.error||'unknown'));
+    sendWS('screenshot', {}, function(r){
+      if(r && r.success){
+        var b64 = r.data && r.data.base64;
+        if(b64){ downloadB64(b64, 'screenshot.png'); toast('Screenshot saved'); }
+        else { toast('Screenshot captured'); }
+      } else {
+        toast('Failed: ' + (r && r.error || 'unknown'));
+      }
     });
   } else if(cmd === 'press_key'){
     sendWS(cmd, params, function(r){
@@ -320,19 +342,26 @@ function sendChat(){
   inp.value = ''; inp.style.height = 'auto';
   var w = document.getElementById('chatWelcome'); if(w) w.remove();
   renderMsg('user', text);
-  var ti = document.createElement('div'); ti.className = 'typing-indicator';
+  chatHistory.push({role:'user',content:text});
+  deliverChat(text, 0);
+}
+function deliverChat(text, retries){
+  var ti = document.querySelector('#chat-messages .typing-indicator');
+  if(ti) ti.remove();
+  ti = document.createElement('div'); ti.className = 'typing-indicator';
   ti.innerHTML = '<span></span><span></span><span></span>';
   document.getElementById('chat-messages').appendChild(ti);
   document.getElementById('chat-messages').scrollTop = 9e9;
-  var history = chatHistory.slice(-10).map(function(h){ return {role:h.role,content:h.content}; });
+  var history = chatHistory.slice(-11,-1).map(function(h){ return {role:h.role,content:h.content}; });
   if(ws && ws.readyState === WebSocket.OPEN){
     ws.send(JSON.stringify({cmd:'chat',text:text,history:history}));
-  } else {
+  } else if(retries < 20){
     connectWS();
-    setTimeout(function(){ sendChat(); }, 500);
-    return;
+    setTimeout(function(){ deliverChat(text, retries + 1); }, 500);
+  } else {
+    ti.remove();
+    renderChatReply({success:false, error:'connection lost'});
   }
-  chatHistory.push({role:'user',content:text});
 }
 function sendExample(t){ document.getElementById('chatInput').value = t; sendChat(); }
 function renderMsg(role, text){
@@ -524,9 +553,7 @@ function applyI18n(){
   var qa = document.querySelectorAll('.qa-btn');
   var qkeys = ['home','back','recent','power','volUp','volDown','enter','delete'];
   qa.forEach(function(el,i){ if(qkeys[i]) el.childNodes[1].textContent = t(qkeys[i]); });
-  // Screen buttons
-  var sbtns = document.querySelector('#right-panel .btn');
-  if(sbtns) sbtns.childNodes[0].textContent = t('scrcpy');
+  // Screen buttons (Play text handled by updateStreamUI; "scrcpy" is a brand name)
   var svbtn = document.querySelector('#right-panel .btn-sm');
   if(svbtn) svbtn.childNodes[0].textContent = t('save');
   // Welcome
@@ -581,4 +608,12 @@ function escHtml(s){
   var d = document.createElement('div');
   d.textContent = s;
   return d.innerHTML;
+}
+function downloadB64(b64, filename){
+  var a = document.createElement('a');
+  a.href = 'data:image/png;base64,' + b64;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
