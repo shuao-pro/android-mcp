@@ -1,4 +1,4 @@
-"""Android MCP Server 鈥?CLI process manager (start/stop/status/restart/forward)."""
+"""Android MCP Server — CLI process manager (start/stop/status/restart/forward)."""
 
 import signal
 import os
@@ -6,6 +6,20 @@ import sys
 import subprocess
 import time
 import argparse
+
+from android_mcp.console import (
+    BLUE,
+    BOLD,
+    GREEN,
+    RED,
+    RESET,
+    YELLOW,
+    err,
+    info,
+    ok,
+    setup_utf8,
+    warn,
+)
 
 # ========== PID management ==========
 
@@ -45,32 +59,6 @@ def cleanup_pid(name: str) -> None:
         os.remove(pid_file)
     except FileNotFoundError:
         pass
-
-
-# ========== Colored output ==========
-
-GREEN = "\033[92m"
-RED = "\033[91m"
-YELLOW = "\033[93m"
-BLUE = "\033[94m"
-BOLD = "\033[1m"
-RESET = "\033[0m"
-
-
-def ok(msg: str) -> None:
-    print(f"{GREEN}{msg}{RESET}")
-
-
-def err(msg: str) -> None:
-    print(f"{RED}{msg}{RESET}")
-
-
-def warn(msg: str) -> None:
-    print(f"{YELLOW}{msg}{RESET}")
-
-
-def info(msg: str) -> None:
-    print(f"{BLUE}{msg}{RESET}")
 
 
 # ========== Command handlers ==========
@@ -228,6 +216,7 @@ def cmd_forward() -> None:
 
 
 def main() -> None:
+    setup_utf8()
     parser = argparse.ArgumentParser(
         prog="android-mcp-gateway",
         description="Android MCP Server management tool",

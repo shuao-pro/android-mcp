@@ -39,16 +39,18 @@ def check_android_connectivity() -> bool:
 def print_startup_banner(mode: str) -> None:
     """Print server startup banner with connectivity status."""
     from android_mcp.config import config
-    from android_mcp.utils import get_lan_ip
+    from android_mcp.console import BOLD, DIM, RESET, err, ok, paint, warn
+    from android_mcp.utils import get_lan_ip, get_version
 
     host, port = config.WEB_HOST, config.WEB_PORT
     mcp_host, mcp_port = config.MCP_HOST, config.MCP_PORT
     lan_ip = get_lan_ip()
 
-    print("=" * 60)
-    print("  Android MCP Server v2.0.2")
-    print("  Shizuku + ADB Tunnel")
-    print("=" * 60)
+    bar = paint("=" * 60, DIM)
+    print(bar)
+    print(f"  {paint('Android MCP Server', BOLD)} {paint('v' + get_version(), DIM)}")
+    print(f"  {paint('Shizuku + ADB Tunnel', DIM)}")
+    print(bar)
 
     if mode in ("mcp-sse", "all-sse"):
         print(f"  MCP:       http://{mcp_host}:{mcp_port}/sse  (SSE)")
@@ -57,41 +59,41 @@ def print_startup_banner(mode: str) -> None:
             print(f"             http://{lan_ip}:{mcp_port}/sse  (LAN)")
             print(f"             http://{lan_ip}:{mcp_port}/mcp  (LAN)")
         if mcp_host == "127.0.0.1":
-            print("  [!] MCP_HOST=127.0.0.1 — phone/WiFi clients WON'T reach this!")
-            print("     Set MCP_HOST=0.0.0.0 in .env to allow external connections.")
+            warn("  [!] MCP_HOST=127.0.0.1 — phone/WiFi clients WON'T reach this!")
+            warn("      Set MCP_HOST=0.0.0.0 in .env to allow external connections.")
         print()
-        print("  Kai 9000 → use the /mcp endpoint")
-        print("  Claude Desktop → use the /sse endpoint")
+        print(f"  {paint('Kai 9000', BOLD)} → /mcp endpoint")
+        print(f"  {paint('Claude Desktop', BOLD)} → /sse endpoint")
     if mode in ("mcp-http",):
         print(f"  MCP HTTP:  http://{mcp_host}:{mcp_port}/mcp")
     if mode in ("mcp", "all"):
         print("  MCP:       stdio (local)")
     if mode in ("web", "all", "all-sse"):
         print(f"  Web GUI:   http://{host}:{port}")
-    print("-" * 60)
+    print(paint("-" * 60, DIM))
 
     if mode != "web":
         print("  Checking Android device...", end=" ", flush=True)
         if check_android_connectivity():
-            print("CONNECTED")
+            ok("CONNECTED")
         else:
-            print("NOT FOUND")
-            print("-" * 60)
-            print("  WARNING: Android device not reachable at")
+            err("NOT FOUND")
+            print(paint("-" * 60, DIM))
+            warn("  Android device not reachable at")
             print(f"  {config.ANDROID_BASE_URL}")
             print()
             print("  To fix:")
-            print(f"  1. Start Shizuku on your phone")
-            print(f"  2. Open Android MCP app → tap Start")
-            print(f"  3. Copy the token shown in the app into .env → ANDROID_TOKEN=")
+            print("  1. Start Shizuku on your phone")
+            print("  2. Open Android MCP app → tap Start")
+            print("  3. Copy the token shown in the app into .env → ANDROID_TOKEN=")
             print(f"  4. Run: adb forward tcp:{config.ANDROID_PORT} tcp:{config.ANDROID_PORT}")
     else:
         print()
 
     if sys.platform == "win32" and mcp_host in ("0.0.0.0", lan_ip):
-        print(f"  💡 Windows Firewall may block port {mcp_port}. Allow Python on first prompt.")
+        warn(f"  [!] Windows Firewall may block port {mcp_port}. Allow Python on first prompt.")
 
-    print("=" * 60)
+    print(bar)
 
 
 def start_web_gui():
@@ -140,7 +142,9 @@ def run(mode: str | None = None) -> None:
     """
     from android_mcp.server import mcp, setup
     from android_mcp.config import config
+    from android_mcp.console import setup_utf8
 
+    setup_utf8()
     setup()
 
     if mode is None:
@@ -164,12 +168,10 @@ def run(mode: str | None = None) -> None:
         asyncio.run(mcp.run_stdio_async())
 
     elif mode == "mcp-sse":
-        print(f"  Connect your MCP client to: http://{mcp_host}:{mcp_port}/sse")
         from android_mcp.server import run_mcp_combined
         asyncio.run(run_mcp_combined(mcp_host, mcp_port))
 
     elif mode == "mcp-http":
-        print(f"  Connect your MCP client to: http://{mcp_host}:{mcp_port}/mcp")
         from android_mcp.server import run_mcp_streamable_http
         asyncio.run(run_mcp_streamable_http(mcp_host, mcp_port))
 

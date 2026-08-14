@@ -74,3 +74,12 @@ def mask_api_key(key: str) -> str:
 def escape_shell_arg(arg: str) -> str:
     """Escape a shell argument with single-quote wrapping."""
     return "'" + arg.replace("'", "'\\''") + "'"
+
+
+# ========== Version ==========
+
+def get_version() -> str:
+    """Return the package version from the single source of truth."""
+    from android_mcp import __version__
+
+    return __version__
