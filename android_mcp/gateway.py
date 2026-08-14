@@ -285,21 +285,29 @@ def cmd_logs() -> None:
         ("Web GUI", os.path.join(PID_DIR, "web.log")),
     ]
 
-    # Print existing content first, then follow appends.
+    # Show only the tail of existing output (not the whole file), then follow
+    # new appends. Prevents an idle service's history from flooding the terminal
+    # and then going silent, which read as "the command quit".
+    tail_lines = 30
     offsets: dict[str, int] = {}
     for name, path in logs:
         info(f"{BOLD}── {name} ({path}) ──{RESET}")
         try:
             with open(path, "r", encoding="utf-8", errors="replace") as f:
-                text = f.read()
-                if text.strip():
-                    print(text, end=("" if text.endswith("\n") else "\n"))
+                lines = f.readlines()
+            if lines:
+                start = max(0, len(lines) - tail_lines)
+                chunk = "".join(lines[start:])
+                print(chunk, end=("" if chunk.endswith("\n") else "\n"), flush=True)
+            else:
+                info("  (log is empty)")
+            # Position after the whole file so we only follow *new* appends.
             offsets[path] = os.path.getsize(path)
         except FileNotFoundError:
             info("  (no log yet — run 'start' first)")
             offsets[path] = 0
 
-    info(f"{BOLD}── following logs (Ctrl+C to stop) ──{RESET}")
+    info(f"{BOLD}── following new output (Ctrl+C to stop) ──{RESET}")
     try:
         while True:
             time.sleep(1)
@@ -314,7 +322,7 @@ def cmd_logs() -> None:
                 if size > start:
                     with open(path, "r", encoding="utf-8", errors="replace") as f:
                         f.seek(start)
-                        print(f.read(), end="")
+                        print(f.read(), end="", flush=True)
                     offsets[path] = size
     except KeyboardInterrupt:
         print()
