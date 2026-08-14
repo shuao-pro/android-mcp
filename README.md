@@ -24,8 +24,9 @@ Control an Android phone with natural language — through Claude Desktop, Cherr
 Three layers cooperate to turn a natural-language request into system-level actions on the device:
 
 ```mermaid
-flowchart TB
+flowchart LR
     subgraph CLIENTS["🤖 MCP Clients"]
+        direction TB
         C1["Claude Desktop<br/>stdio / SSE"]
         C2["Kai 9000<br/>Streamable HTTP"]
         C3["Cherry Studio<br/>Streamable HTTP"]
@@ -33,6 +34,7 @@ flowchart TB
     end
 
     subgraph SERVER["🐍 Python Server · android_mcp/"]
+        direction TB
         S1["FastMCP<br/>29 tools · :9000<br/>/sse + /mcp"]
         S2["Web GUI · FastAPI<br/>:8080 · WebSocket"]
         S3["tools/<br/>thin wrappers"]
@@ -45,6 +47,7 @@ flowchart TB
     end
 
     subgraph PHONE["📱 Android App · Kotlin + Shizuku"]
+        direction TB
         P1["HttpServer<br/>:18080"]
         P2["Router<br/>JSON-RPC dispatch"]
         P3["api/<br/>shell · input · file · system"]

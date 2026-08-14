@@ -23,8 +23,9 @@
 三个层级协同工作，把自然语言请求转化为设备上的系统级操作：
 
 ```mermaid
-flowchart TB
+flowchart LR
     subgraph CLIENTS["🤖 MCP 客户端"]
+        direction TB
         C1["Claude Desktop<br/>stdio / SSE"]
         C2["Kai 9000<br/>Streamable HTTP"]
         C3["Cherry Studio<br/>Streamable HTTP"]
@@ -32,6 +33,7 @@ flowchart TB
     end
 
     subgraph SERVER["🐍 Python 服务器 · android_mcp/"]
+        direction TB
         S1["FastMCP<br/>29 个工具 · :9000<br/>/sse + /mcp"]
         S2["Web GUI · FastAPI<br/>:8080 · WebSocket"]
         S3["tools/<br/>薄封装层"]
@@ -44,6 +46,7 @@ flowchart TB
     end
 
     subgraph PHONE["📱 Android 应用 · Kotlin + Shizuku"]
+        direction TB
         P1["HttpServer<br/>:18080"]
         P2["Router<br/>JSON-RPC 分发"]
         P3["api/<br/>shell · input · file · system"]
