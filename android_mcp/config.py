@@ -20,6 +20,12 @@ class Config:
     # strict = block high/medium-risk operations.
     SAFETY_MODE: str = os.getenv("SAFETY_MODE", "confirm")
 
+    # AI multi-step agent loop (web chat)
+    AGENT_MAX_STEPS: int = int(os.getenv("AGENT_MAX_STEPS", "10"))
+    AGENT_VISUAL: bool = os.getenv("AGENT_VISUAL", "true").strip().lower() in ("1", "true", "yes", "on")
+    AGENT_MAX_RETRIES: int = int(os.getenv("AGENT_MAX_RETRIES", "2"))
+    AGENT_MAX_CONSECUTIVE_FAILURES: int = int(os.getenv("AGENT_MAX_CONSECUTIVE_FAILURES", "3"))
+
     # Web GUI
     WEB_HOST: str = os.getenv("WEB_HOST", "127.0.0.1")
     WEB_PORT: int = int(os.getenv("WEB_PORT", "8080"))
@@ -61,6 +67,11 @@ class Config:
             warnings.append(
                 f"SAFETY_MODE={self.SAFETY_MODE!r} is invalid. "
                 f"Use: permissive, confirm, or strict"
+            )
+
+        if self.AGENT_MAX_STEPS < 1 or self.AGENT_MAX_STEPS > 50:
+            warnings.append(
+                f"AGENT_MAX_STEPS={self.AGENT_MAX_STEPS} is out of range (1-50)"
             )
 
         valid_providers = ("anthropic", "openai", "custom")

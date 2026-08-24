@@ -12,6 +12,7 @@ Single-shot behavior is preserved via :func:`process_message`, which delegates
 to :func:`run_agent`.
 """
 
+import asyncio
 from typing import Any
 
 from android_mcp.utils import parse_json_lenient
@@ -309,19 +310,74 @@ async def _describe_screen(client) -> str:
         return ""
 
 
+# ========== Failure classification & retry ==========
+
+
+def _classify_error(result: Any) -> str:
+    """Classify a tool result: ok | offline | blocked | transient | failed."""
+    if not isinstance(result, dict):
+        return "failed"
+    if result.get("success"):
+        return "ok"
+    if result.get("blocked"):
+        return "blocked"
+    err = (result.get("error") or result.get("stderr") or "").lower()
+    if ("not reachable" in err or "disconnected" in err or "offline" in err
+            or "connecterror" in err or "remote protocol" in err):
+        return "offline"
+    if "timed out" in err or "timeout" in err:
+        return "transient"
+    return "failed"
+
+
+async def _chat_with_retry(client, system_prompt: str, messages: list[dict]) -> str | None:
+    """Call the LLM, retrying transient errors with a small backoff."""
+    from android_mcp.config import config
+
+    max_retries = config.AGENT_MAX_RETRIES
+    for attempt in range(max_retries + 1):
+        try:
+            return await client.chat(system_prompt, messages)
+        except Exception:
+            if attempt >= max_retries:
+                return None
+            await asyncio.sleep(0.5 * (attempt + 1))
+    return None
+
+
+async def _execute_with_retry(fn, params: dict) -> tuple[Any, int]:
+    """Execute a tool, retrying transient errors (e.g. timeouts) with backoff."""
+    from android_mcp.config import config
+
+    max_retries = config.AGENT_MAX_RETRIES
+    result: Any = None
+    for attempt in range(max_retries + 1):
+        try:
+            result = await fn(**params)
+        except Exception as e:
+            result = {"success": False, "error": str(e)}
+        if _classify_error(result) != "transient" or attempt >= max_retries:
+            return result, attempt
+        await asyncio.sleep(0.5 * (attempt + 1))
+    return result, max_retries
+
+
 # ========== Multi-step Agent ==========
 
 
 async def run_agent(
     goal: str,
     history: list[dict] | None = None,
-    max_steps: int = 10,
-    visual: bool = True,
+    max_steps: int | None = None,
+    visual: bool | None = None,
 ) -> dict[str, Any]:
     """Run the closed-loop agent until the goal is done or ``max_steps`` reached.
 
-    Returns a dict with ``success``, ``reply``, and ``steps`` (list of steps).
+    ``max_steps`` and ``visual`` fall back to ``AGENT_MAX_STEPS`` / ``AGENT_VISUAL``
+    from config when omitted. Returns ``success``, ``reply`` and ``steps``.
     """
+    from android_mcp.config import config
+
     client = _get_llm_client()
     if client is None:
         msg = (
@@ -331,17 +387,22 @@ async def run_agent(
         )
         return {"success": False, "reply": msg, "error": msg}
 
+    if max_steps is None:
+        max_steps = config.AGENT_MAX_STEPS
+    if visual is None:
+        visual = config.AGENT_VISUAL
+
     system_prompt = _build_agent_system_prompt()
     messages = list(history or [])
     messages.append({"role": "user", "content": goal})
 
     steps: list[dict[str, Any]] = []
+    consecutive_failures = 0
 
     for i in range(max_steps):
-        try:
-            raw_text = await client.chat(system_prompt, messages)
-        except Exception as e:
-            msg = f"LLM request failed: {e}"
+        raw_text = await _chat_with_retry(client, system_prompt, messages)
+        if raw_text is None:
+            msg = "LLM request failed after retries."
             return {"success": False, "reply": msg, "error": msg, "steps": steps}
 
         try:
@@ -370,23 +431,44 @@ async def run_agent(
         if tool_name not in TOOL_REGISTRY:
             avail = ", ".join(TOOL_REGISTRY.keys())
             messages.append({"role": "user", "content": f"[system] unknown tool '{tool_name}'. Available tools: {avail}"})
+            consecutive_failures += 1
+            if consecutive_failures >= config.AGENT_MAX_CONSECUTIVE_FAILURES:
+                msg = f"Aborted after {consecutive_failures} consecutive failed steps."
+                return {"success": False, "reply": msg, "error": msg, "steps": steps}
             continue
 
         fn, _ = TOOL_REGISTRY[tool_name]
-        try:
-            result = await fn(**params)
-        except Exception as e:
-            result = {"success": False, "error": str(e)}
+        result, attempts = await _execute_with_retry(fn, params)
 
         summary = _summarize_result(tool_name, result)
+        category = _classify_error(result)
+
         steps.append({
             "step": i + 1,
             "tool": tool_name,
             "params": params,
             "ok": bool(isinstance(result, dict) and result.get("success")),
             "summary": summary,
+            "retries": attempts,
+            "category": category,
         })
+
+        if category == "offline":
+            msg = f"Device offline: {summary}"
+            return {"success": False, "reply": msg, "error": msg, "steps": steps}
+        if category == "blocked":
+            msg = f"Operation not approved: {summary}"
+            return {"success": False, "reply": msg, "error": msg, "steps": steps}
+
         messages.append({"role": "user", "content": f"[tool result for {tool_name}] {summary}"})
+
+        if category == "failed":
+            consecutive_failures += 1
+            if consecutive_failures >= config.AGENT_MAX_CONSECUTIVE_FAILURES:
+                msg = f"Aborted after {consecutive_failures} consecutive failed steps: {summary}"
+                return {"success": False, "reply": msg, "error": msg, "steps": steps}
+        else:
+            consecutive_failures = 0
 
         # Optional visual verification between steps.
         if visual and tool_name not in ("take_screenshot", "get_screenshot"):
