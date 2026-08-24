@@ -362,6 +362,7 @@ android-mcp/
 │   ├── server.py          # FastMCP server definition (tool registry)
 │   ├── main.py            # Entry point (mode dispatch)
 │   ├── config.py          # Environment config (.env loader)
+│   ├── safety.py          # Risk classification + user confirmation gate
 │   ├── console.py         # Colored console output helpers
 │   ├── utils.py           # LAN IP + version helpers
 │   ├── gateway.py         # CLI process manager
@@ -371,43 +372,51 @@ android-mcp/
 │   │   ├── device.py      # Health, info, screenshot, shell, reboot
 │   │   ├── input.py       # Click, swipe, drag, keys, type_text
 │   │   ├── apps.py        # Package management
-│   │   ├── system.py      # Battery, clipboard, notifications, settings
-│   │   └── files.py       # File read/write/list/delete
+│   │   ├── system.py      # Battery, clipboard, notifications, settings, mode
+│   │   ├── files.py       # File read/write/list/delete
+│   │   └── tasks.py       # Long-running task submit/status/result/cancel/list
 │   ├── tools/             # MCP tool layer (thin wrappers over bridge)
+│   │   ├── __init__.py    # register_all_tools()
 │   │   ├── decorators.py  # @bridge_call error-handling decorator
 │   │   ├── device.py      # Health, info, battery, screenshot, UI hierarchy
 │   │   ├── input.py       # Touch, swipe, keys
 │   │   ├── apps.py        # Package management
-│   │   ├── system.py      # Shell, settings, clipboard
+│   │   ├── system.py      # Shell, settings, clipboard, privilege mode
 │   │   ├── files.py       # File read/write
+│   │   ├── tasks.py       # Task tools (submit/poll/run_task_and_wait)
 │   │   └── vision.py      # AI element recognition
 │   ├── vision/            # Vision model clients
 │   │   ├── models.py      # Data classes + Protocol
-│   │   ├── clients.py     # Anthropic + OpenAI clients
+│   │   ├── clients.py     # Anthropic + OpenAI clients (+ screen description)
 │   │   └── prompts.py     # Prompt builder + parser
 │   └── web/               # Web GUI
 │       ├── server.py      # FastAPI + WebSocket
-│       ├── chat_agent.py  # AI chat → tool execution
+│       ├── chat_agent.py  # Multi-step agent loop (tool chaining + vision)
 │       ├── scrcpy_bridge.py # scrcpy + frame streaming
 │       └── static/        # HTML/CSS/JS frontend
 ├── android/               # Android APK project
 │   ├── app/src/main/
 │   │   ├── java/com/example/androidmcp/
 │   │   │   ├── App.kt             # Application class
-│   │   │   ├── MainActivity.kt    # Main UI + Shizuku auth
+│   │   │   ├── MainActivity.kt    # Main UI + privilege mode + auth
 │   │   │   ├── McpService.kt      # Foreground service
 │   │   │   ├── api/
 │   │   │   │   ├── FileApi.kt     # File read/write/delete
 │   │   │   │   ├── InputApi.kt    # Touch, swipe, key events
 │   │   │   │   ├── PackageApi.kt  # App install/uninstall
 │   │   │   │   ├── ShellApi.kt    # Shell command execution
-│   │   │   │   └── SystemApi.kt   # Screenshot, clipboard, settings
+│   │   │   │   ├── SystemApi.kt   # Screenshot, clipboard, settings, mode
+│   │   │   │   └── TaskApi.kt     # Task submit/status/result/cancel/list
 │   │   │   ├── server/
 │   │   │   │   ├── HttpServer.kt  # Embedded HTTP server (:18080)
 │   │   │   │   └── Router.kt      # JSON-RPC method dispatch
 │   │   │   └── util/
-│   │   │       ├── ShizukuHelper.kt # Shizuku binder wrapper
-│   │   │       └── TokenStore.kt    # Bridge auth token (generate + persist)
+│   │   │       ├── PrivilegeExecutor.kt # Mode routing (AUTO/ROOT/SHIZUKU)
+│   │   │       ├── RootHelper.kt        # su backend (uid 0)
+│   │   │       ├── ShizukuHelper.kt     # Shizuku binder backend
+│   │   │       ├── TaskManager.kt       # Background task queue + state machine
+│   │   │       ├── ExecResult.kt        # Command result + process handle
+│   │   │       └── TokenStore.kt        # Bridge auth token (generate + persist)
 │   │   └── res/                   # Layout, drawable, strings
 │   ├── gradle/                    # Gradle wrapper
 │   ├── build.gradle.kts

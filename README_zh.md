@@ -364,6 +364,7 @@ android-mcp/
 │   ├── server.py          # FastMCP 服务定义（工具注册）
 │   ├── main.py            # 入口（模式分发）
 │   ├── config.py          # 环境配置（.env 加载）
+│   ├── safety.py          # 风险分级 + 用户确认门控
 │   ├── console.py         # 彩色控制台输出
 │   ├── utils.py           # 局域网 IP + 版本工具
 │   ├── gateway.py         # CLI 进程管理
@@ -373,43 +374,51 @@ android-mcp/
 │   │   ├── device.py      # 健康、信息、截图、Shell、重启
 │   │   ├── input.py       # 点击、滑动、拖拽、按键、输入
 │   │   ├── apps.py        # 应用管理
-│   │   ├── system.py      # 电池、剪贴板、通知、系统设置
-│   │   └── files.py       # 文件读写/列表/删除
+│   │   ├── system.py      # 电池、剪贴板、通知、系统设置、模式
+│   │   ├── files.py       # 文件读写/列表/删除
+│   │   └── tasks.py       # 长任务提交/状态/结果/取消/列表
 │   ├── tools/             # MCP 工具层（对 bridge 的薄封装）
+│   │   ├── __init__.py    # register_all_tools()
 │   │   ├── decorators.py  # @bridge_call 错误处理装饰器
 │   │   ├── device.py      # 健康、信息、电池、截图、UI 层级
 │   │   ├── input.py       # 触控、滑动、按键
 │   │   ├── apps.py        # 应用管理
-│   │   ├── system.py      # Shell、设置、剪贴板
+│   │   ├── system.py      # Shell、设置、剪贴板、特权模式
 │   │   ├── files.py       # 文件读写
+│   │   ├── tasks.py       # 任务工具（提交/轮询/run_task_and_wait）
 │   │   └── vision.py      # AI 元素识别
 │   ├── vision/            # 视觉模型客户端
 │   │   ├── models.py      # 数据结构 + Protocol
-│   │   ├── clients.py     # Anthropic + OpenAI 客户端
+│   │   ├── clients.py     # Anthropic + OpenAI 客户端（+ 屏幕描述）
 │   │   └── prompts.py     # 提示词 + 解析器
 │   └── web/               # Web 控制台
 │       ├── server.py      # FastAPI + WebSocket
-│       ├── chat_agent.py  # AI 对话 → 工具执行
+│       ├── chat_agent.py  # 多步智能体循环（工具串联 + 视觉校验）
 │       ├── scrcpy_bridge.py # scrcpy + 画面推流
 │       └── static/        # HTML/CSS/JS 前端
 ├── android/               # Android APK 项目
 │   ├── app/src/main/
 │   │   ├── java/com/example/androidmcp/
 │   │   │   ├── App.kt             # Application 入口
-│   │   │   ├── MainActivity.kt    # 主界面 + Shizuku 授权
+│   │   │   ├── MainActivity.kt    # 主界面 + 特权模式 + 授权
 │   │   │   ├── McpService.kt      # 前台服务
 │   │   │   ├── api/
 │   │   │   │   ├── FileApi.kt     # 文件读写/删除
 │   │   │   │   ├── InputApi.kt    # 触控、滑动、按键
 │   │   │   │   ├── PackageApi.kt  # 应用安装/卸载
 │   │   │   │   ├── ShellApi.kt    # Shell 命令执行
-│   │   │   │   └── SystemApi.kt   # 截图、剪贴板、系统设置
+│   │   │   │   ├── SystemApi.kt   # 截图、剪贴板、系统设置、模式
+│   │   │   │   └── TaskApi.kt     # 任务提交/状态/结果/取消/列表
 │   │   │   ├── server/
 │   │   │   │   ├── HttpServer.kt  # 内嵌 HTTP 服务器 (:18080)
 │   │   │   │   └── Router.kt      # JSON-RPC 方法路由
 │   │   │   └── util/
-│   │   │       ├── ShizukuHelper.kt # Shizuku binder 封装
-│   │   │       └── TokenStore.kt    # 桥接鉴权 Token（生成 + 持久化）
+│   │   │       ├── PrivilegeExecutor.kt # 模式路由（AUTO/ROOT/SHIZUKU）
+│   │   │       ├── RootHelper.kt        # su 后端（uid 0）
+│   │   │       ├── ShizukuHelper.kt     # Shizuku binder 后端
+│   │   │       ├── TaskManager.kt       # 后台任务队列 + 状态机
+│   │   │       ├── ExecResult.kt        # 命令结果 + 进程句柄
+│   │   │       └── TokenStore.kt        # 桥接鉴权 Token（生成 + 持久化）
 │   │   └── res/                   # 布局、图标、字符串资源
 │   ├── gradle/                    # Gradle 构建系统
 │   ├── build.gradle.kts
