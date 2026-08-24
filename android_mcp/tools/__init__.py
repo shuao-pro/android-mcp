@@ -54,6 +54,14 @@ from android_mcp.tools.vision import (
     tool_find_element,
     tool_click_element,
 )
+from android_mcp.tools.tasks import (
+    tool_submit_task,
+    tool_get_task_status,
+    tool_get_task_result,
+    tool_cancel_task,
+    tool_list_tasks,
+    tool_run_task_and_wait,
+)
 
 __all__ = [
     # device
@@ -93,6 +101,13 @@ __all__ = [
     # vision
     "tool_find_element",
     "tool_click_element",
+    # tasks
+    "tool_submit_task",
+    "tool_get_task_status",
+    "tool_get_task_result",
+    "tool_cancel_task",
+    "tool_list_tasks",
+    "tool_run_task_and_wait",
 ]
 
 
@@ -280,6 +295,50 @@ def register_all_tools(mcp) -> None:
             return {"success": False, "error": err, "blocked": True}
         return await tool_write_file(path, content)
 
+    # -- tasks --
+    @mcp.tool()
+    async def submit_task(command: str, timeout: float = 0, ctx: Context = None) -> Dict[str, Any]:
+        """Submit a command to run in the background on the device. High-risk commands require approval."""
+        risk = safety.classify_shell(command)
+        allowed, err = await safety.gate(ctx, risk, f"background task command: {command[:200]}")
+        if not allowed:
+            return {"success": False, "error": err, "blocked": True}
+        return await tool_submit_task(command, timeout)
+
+    @mcp.tool()
+    async def get_task_status(task_id: str) -> Dict[str, Any]:
+        """Get the current state of a background task (RUNNING/DONE/ERROR/TIMEOUT/CANCELLED)."""
+        return await tool_get_task_status(task_id)
+
+    @mcp.tool()
+    async def get_task_result(task_id: str) -> Dict[str, Any]:
+        """Get the final result (stdout/stderr/exit_code) of a background task."""
+        return await tool_get_task_result(task_id)
+
+    @mcp.tool()
+    async def cancel_task(task_id: str) -> Dict[str, Any]:
+        """Cancel a running background task."""
+        return await tool_cancel_task(task_id)
+
+    @mcp.tool()
+    async def list_tasks() -> Dict[str, Any]:
+        """List all background tasks on the device."""
+        return await tool_list_tasks()
+
+    @mcp.tool()
+    async def run_task_and_wait(
+        command: str,
+        timeout: float = 0,
+        poll_interval: float = 1.0,
+        max_wait: float = 600,
+        ctx: Context = None,
+    ) -> Dict[str, Any]:
+        """Submit a long-running command and wait for completion (up to max_wait seconds). High-risk commands require approval."""
+        risk = safety.classify_shell(command)
+        allowed, err = await safety.gate(ctx, risk, f"background task command: {command[:200]}")
+        if not allowed:
+            return {"success": False, "error": err, "blocked": True}
+        return await tool_run_task_and_wait(command, timeout, poll_interval, max_wait)
     # -- vision --
     @mcp.tool()
     async def find_element(description: str) -> Dict[str, Any]:

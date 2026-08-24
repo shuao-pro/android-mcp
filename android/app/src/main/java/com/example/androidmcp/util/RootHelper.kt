@@ -122,11 +122,15 @@ object RootHelper {
         }
     }
 
-    fun exec(command: String): ExecResult {
+    fun exec(
+        command: String,
+        timeoutMs: Long = EXEC_TIMEOUT_MS,
+        onProcess: ((Process) -> Unit)? = null
+    ): ExecResult {
         if (!isReady()) {
             return ExecResult(-1, "", "Root not ready: ${getStatusSummary()}")
         }
-        return runProcess(listOf("su", "-c", command), EXEC_TIMEOUT_MS)
+        return runProcess(listOf("su", "-c", command), timeoutMs, onProcess)
     }
 
     fun isReady(): Boolean = isAvailable && isPermissionGranted && isVerified
@@ -177,19 +181,34 @@ object RootHelper {
         return ok
     }
 
-    /** Run a process, reading stdout/stderr concurrently to avoid pipe deadlock. */
-    private fun runProcess(cmd: List<String>, timeoutMs: Long): ExecResult {
+    /**
+     * Run a process, reading stdout/stderr concurrently to avoid pipe deadlock.
+     * A timeoutMs <= 0 means "no timeout". [onProcess] is invoked as soon as the
+     * process is spawned (used to expose the Process for cancellation).
+     */
+    private fun runProcess(
+        cmd: List<String>,
+        timeoutMs: Long,
+        onProcess: ((Process) -> Unit)? = null
+    ): ExecResult {
         return try {
             val process = ProcessBuilder(cmd)
                 .redirectErrorStream(false)
                 .start()
+
+            onProcess?.invoke(process)
 
             val outReader = StreamReader(process.inputStream)
             val errReader = StreamReader(process.errorStream)
             outReader.start()
             errReader.start()
 
-            val finished = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
+            val finished = if (timeoutMs > 0) {
+                process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
+            } else {
+                process.waitFor()
+                true
+            }
             if (!finished) {
                 process.destroyForcibly()
             }
@@ -198,9 +217,9 @@ object RootHelper {
             errReader.join(2_000)
 
             if (!finished) {
-                ExecResult(-1, outReader.text, "timeout after ${timeoutMs}ms")
+                ExecResult(-1, outReader.text, "timeout after ${timeoutMs}ms", process, true)
             } else {
-                ExecResult(process.exitValue(), outReader.text.trim(), errReader.text.trim())
+                ExecResult(process.exitValue(), outReader.text.trim(), errReader.text.trim(), process, false)
             }
         } catch (e: Exception) {
             ExecResult(-1, "", e.message ?: "Unknown error")

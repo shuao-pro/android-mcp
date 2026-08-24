@@ -6,8 +6,9 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Log
 import rikka.shizuku.Shizuku
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
+import java.util.concurrent.TimeUnit
 
 object ShizukuHelper {
 
@@ -116,24 +117,54 @@ object ShizukuHelper {
         }
     }
 
-    fun exec(command: String): ExecResult {
+    fun exec(
+        command: String,
+        timeoutMs: Long = 0L,
+        onProcess: ((Process) -> Unit)? = null
+    ): ExecResult {
         if (!isReady()) {
             return ExecResult(-1, "", "Shizuku not ready: ${getStatusSummary()}")
         }
-        return execInternal(command)
+        return execInternal(command, timeoutMs, onProcess)
     }
 
-    private fun execInternal(command: String): ExecResult {
+    private fun execInternal(
+        command: String,
+        timeoutMs: Long = 0L,
+        onProcess: ((Process) -> Unit)? = null
+    ): ExecResult {
         return try {
             val method = Shizuku::class.java.getDeclaredMethod(
                 "newProcess", Array<String>::class.java, Array<String>::class.java, String::class.java
             )
             method.isAccessible = true
             val process = method.invoke(null, arrayOf("sh", "-c", command), null, null) as Process
-            val stdout = BufferedReader(InputStreamReader(process.inputStream)).readText()
-            val stderr = BufferedReader(InputStreamReader(process.errorStream)).readText()
-            val exitCode = process.waitFor()
-            ExecResult(exitCode, stdout.trim(), stderr.trim())
+
+            onProcess?.invoke(process)
+
+            val outReader = StreamReader(process.inputStream)
+            val errReader = StreamReader(process.errorStream)
+            outReader.start()
+            errReader.start()
+
+            val finished = if (timeoutMs > 0) {
+                process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
+            } else {
+                process.waitFor()
+                true
+            }
+            if (!finished) {
+                process.destroyForcibly()
+            }
+
+            outReader.join(2_000)
+            errReader.join(2_000)
+
+            if (!finished) {
+                ExecResult(-1, outReader.text, "timeout after ${timeoutMs}ms", process, true)
+            } else {
+                ExecResult(process.exitValue(), outReader.text.trim(), errReader.text.trim(), process, false)
+            }
         } catch (e: Exception) {
             ExecResult(-1, "", e.message ?: "Unknown error")
         }
@@ -143,5 +174,26 @@ object ShizukuHelper {
 
     fun getStatusSummary(): String {
         return "available=$isAvailable, permission=$isPermissionGranted, verified=$isVerified"
+    }
+
+    private class StreamReader(private val input: InputStream) : Thread() {
+        @Volatile
+        var text: String = ""
+            private set
+
+        override fun run() {
+            val buffer = ByteArrayOutputStream()
+            val chunk = ByteArray(8192)
+            try {
+                var n = input.read(chunk)
+                while (n >= 0) {
+                    buffer.write(chunk, 0, n)
+                    n = input.read(chunk)
+                }
+            } catch (_: Exception) {
+            } finally {
+                text = buffer.toString("UTF-8")
+            }
+        }
     }
 }

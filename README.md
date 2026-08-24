@@ -35,15 +35,18 @@ flowchart LR
 
     subgraph SERVER["🐍 Python Server · android_mcp/"]
         direction TB
-        S1["FastMCP<br/>31 tools · :9000<br/>/sse + /mcp"]
+        S1["FastMCP<br/>37 tools · :9000<br/>/sse + /mcp"]
         S2["Web GUI · FastAPI<br/>:8080 · WebSocket"]
         S3["tools/<br/>thin wrappers"]
         S4["bridge/<br/>JSON-RPC transport"]
         S5["vision/<br/>AI element locator"]
         S6["safety/<br/>risk gate · user confirm"]
+        S7["tasks/<br/>submit · poll · result"]
         S1 --- S3
         S3 --- S4
         S3 --- S6
+        S3 --- S7
+        S7 --- S4
         S2 --- S4
         S2 --- S5
     end
@@ -56,9 +59,12 @@ flowchart LR
         P4["PrivilegeExecutor<br/>AUTO / ROOT / SHIZUKU"]
         P5["Root (su)<br/>UID 0"]
         P6["Shizuku<br/>UID 2000"]
+        P7["TaskApi + TaskManager<br/>async task queue"]
         P1 --- P2
         P2 --- P3
+        P2 --- P7
         P3 --- P4
+        P7 --- P4
         P4 --- P5
         P4 --- P6
     end
@@ -77,15 +83,17 @@ flowchart LR
 |-------|-----------|----------------|----------|
 | **Clients** | Claude Desktop / Kai 9000 / Cherry Studio | Send tool calls as MCP messages | stdio, SSE, Streamable HTTP |
 | | Web Dashboard | Browser panel, live screen, AI chat | FastAPI + WebSocket |
-| **Python server** | `server.py` (FastMCP) | Registers 31 tools, speaks MCP | FastMCP |
+| **Python server** | `server.py` (FastMCP) | Registers 37 tools, speaks MCP | FastMCP |
 | | `bridge/` | JSON-RPC → device, auto ADB forward | httpx, JSON-RPC 2.0 |
 | | `tools/` | Thin `@bridge_call` wrappers | decorators |
 | | `safety/` | Risk classification + user confirmation gate | MCP elicitation, SAFETY_MODE |
 | | `web/` | Dashboard API, chat, scrcpy stream | FastAPI, uvicorn |
 | | `vision/` | AI screen-element recognition | Claude Vision / GPT-4o |
+| | `tasks/` | Long-running task submit / poll / result | task.submit/status/result RPC |
 | **Android app** | `HttpServer` | Embedded HTTP server :18080, token auth | Java `ServerSocket` |
 | | `Router` | JSON-RPC method dispatch | JSON-RPC 2.0 |
-| | `api/*` | Shell, input, package, file, system | PrivilegeExecutor (Root / Shizuku) |
+| | `api/*` | Shell, input, package, file, system, task | PrivilegeExecutor (Root / Shizuku) |
+| | `TaskManager` / `TaskApi` | Background task queue + JSON-RPC API | thread pool, task state machine |
 | | `util/` | Privilege executor + token store | `PrivilegeExecutor`, `RootHelper`, `ShizukuHelper`, `TokenStore` |
 
 ### Request lifecycle
@@ -113,7 +121,7 @@ Every tool call follows one path — e.g. `click(x, y)`:
 > 💡 The server can run on the phone itself (Termux / Kai 9000). Set `ANDROID_HOST=127.0.0.1` — no ADB needed.
 ## ✨ Features
 
-### Device Control (31 MCP Tools)
+### Device Control (37 MCP Tools)
 
 | Category | Tools |
 |----------|-------|
@@ -125,6 +133,7 @@ Every tool call follows one path — e.g. `click(x, y)`:
 | **Files** | `read_file`, `write_file` (including `/data/data`) |
 | **System** | `get_system_setting`, `put_system_setting`, `set_clipboard`, `get_clipboard`, `get_notifications`, `start_activity` |
 | **Privilege** | `get_privilege_mode`, `set_privilege_mode` — switch device execution backend (auto / shizuku / root) |
+| **Tasks** | `submit_task`, `get_task_status`, `get_task_result`, `cancel_task`, `list_tasks`, `run_task_and_wait` — long-running commands as background tasks |
 | **Vision** | `find_element` — AI locates UI elements, `click_element` — find + click in one step |
 
 ### 🛡️ Safety Guard
@@ -149,6 +158,18 @@ The Android app executes commands through a unified **PrivilegeExecutor** that s
 
 Selectable from the Android app UI, the Web Dashboard, or the `set_privilege_mode` MCP tool.
 
+### ⏳ Long-running Tasks
+
+Commands that may exceed the 30s HTTP timeout run as asynchronous background tasks on the device:
+
+- `submit_task` / `run_task_and_wait` — run a command in the background and poll until it finishes
+- `get_task_status` / `get_task_result` / `cancel_task` / `list_tasks` — monitor and control tasks
+- On-device `TaskManager` runs commands on a dedicated thread pool (10 concurrent) with output truncation and automatic cleanup
+
+### 🤖 Multi-step Agent
+
+The Web Dashboard AI chat uses a closed-loop agent: it chains multiple tool calls (with screenshots + vision verification, long-running tasks, and retries) until the goal is done — up to 10 steps.
+
 ### AI Vision
 
 - AI-powered screen element recognition via Claude Vision / GPT-4o / custom API
@@ -157,7 +178,7 @@ Selectable from the Android app UI, the Web Dashboard, or the `set_privilege_mod
 
 ### Web Dashboard
 
-- **AI Chat** — control the phone by typing "open settings" or "click the search icon"
+- **AI Chat** — multi-step agent: describe a goal and it chains tool calls (screenshots + vision, long-running tasks, retries) until done
 - **Live Screen** — 10fps WebSocket stream with click-to-touch
 - **scrcpy** — native low-latency mirroring (one-click launch)
 - **Setup Wizard** — guided 5-step setup with auto-detection + MCP SSE endpoint display

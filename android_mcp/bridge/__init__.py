@@ -48,6 +48,13 @@ from android_mcp.bridge.files import (
     read_file,
     write_file,
 )
+from android_mcp.bridge.tasks import (
+    cancel_task,
+    get_task_result,
+    get_task_status,
+    list_tasks,
+    submit_task,
+)
 from android_mcp.bridge.system import (
     cancel_notification,
     get_battery_info,
@@ -107,4 +114,10 @@ __all__ = [
     "start_activity",
     "get_mode",
     "set_mode",
+    # tasks
+    "submit_task",
+    "get_task_status",
+    "get_task_result",
+    "cancel_task",
+    "list_tasks",
 ]

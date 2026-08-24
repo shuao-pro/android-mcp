@@ -1,7 +1,15 @@
-﻿"""AI Chat Agent — translates natural language to Android MCP tool calls.
+"""AI Chat Agent — multi-step, closed-loop device control.
 
-Uses the configured vision/LLM provider (Anthropic/OpenAI/custom) to interpret
-user requests and execute the appropriate device control tools.
+Translates a natural-language goal into a sequence of Android MCP tool calls.
+The agent loop:
+
+1. LLM decides the next action (a tool call, or "done").
+2. The tool is executed (including long-running tasks via run_task_and_wait).
+3. The result (and optionally a vision description of the screen) is fed back.
+4. The LLM decides whether to continue or finish — up to ``max_steps``.
+
+Single-shot behavior is preserved via :func:`process_message`, which delegates
+to :func:`run_agent`.
 """
 
 from typing import Any
@@ -24,7 +32,7 @@ def _register(name: str, description: str):
 # ========== Tool Definitions ==========
 
 
-@_register("shell", "Execute a shell command on the Android device with ADB/Shizuku privileges. Params: command (str), timeout (float, default 30).")
+@_register("shell", "Execute a shell command on the Android device with ADB/Shizuku/root privileges. Params: command (str), timeout (float, default 30).")
 async def _shell(command: str, timeout: float = 30.0):
     from android_mcp import bridge
     return await bridge.shell(command, timeout)
@@ -144,33 +152,110 @@ async def _get_notifications():
     return await bridge.get_notifications()
 
 
+# ---- Long-running task tools ----
+
+@_register("run_task_and_wait", "Run a long-running shell command and wait for completion. Params: command (str), timeout (float, default 0=unlimited), poll_interval (float, default 1.0), max_wait (float, default 600).")
+async def _run_task_and_wait(command: str, timeout: float = 0, poll_interval: float = 1.0, max_wait: float = 600):
+    from android_mcp.tools.tasks import tool_run_task_and_wait
+    return await tool_run_task_and_wait(command, timeout, poll_interval, max_wait)
+
+
+@_register("submit_task", "Submit a command to run in the background. Returns task_id. Params: command (str), timeout (float, default 0).")
+async def _submit_task(command: str, timeout: float = 0):
+    from android_mcp import bridge
+    return await bridge.submit_task(command, timeout)
+
+
+@_register("get_task_status", "Get the state of a background task. Params: task_id (str).")
+async def _get_task_status(task_id: str):
+    from android_mcp import bridge
+    return await bridge.get_task_status(task_id)
+
+
+@_register("get_task_result", "Get the final result of a background task. Params: task_id (str).")
+async def _get_task_result(task_id: str):
+    from android_mcp import bridge
+    return await bridge.get_task_result(task_id)
+
+
+@_register("cancel_task", "Cancel a running background task. Params: task_id (str).")
+async def _cancel_task(task_id: str):
+    from android_mcp import bridge
+    return await bridge.cancel_task(task_id)
+
+
+@_register("list_tasks", "List all background tasks on the device. No params.")
+async def _list_tasks():
+    from android_mcp import bridge
+    return await bridge.list_tasks()
+
+
 # ========== System Prompt ==========
 
 
-def _build_system_prompt() -> str:
+def _build_agent_system_prompt() -> str:
     tools_text = ""
     for name, (_, desc) in TOOL_REGISTRY.items():
         tools_text += f"\n- **{name}**: {desc}"
 
-    return f"""You are an AI assistant that controls an Android device. You have access to device control tools.
+    return f"""You are an AI assistant that controls an Android device. You can complete multi-step tasks by calling tools one at a time.
 
-When the user asks you to do something on their phone, respond with a JSON object containing the tool to call.
+Each turn, respond with ONE JSON object in exactly one of these forms:
+
+1. To perform an action: {{"tool": "tool_name", "params": {{...}}}}
+2. To finish successfully: {{"done": true, "reply": "short summary of what you did"}}
+3. To answer a question without any device action: {{"reply": "your answer"}}
 
 Rules:
-1. If the user just wants to chat or ask a question, reply with: {{"reply": "your text response"}}
-2. If the user wants you to DO something on the device, respond with: {{"tool": "tool_name", "params": {{...}}}}
-3. For visual tasks (clicking buttons, finding elements on screen), use click_element which uses AI vision.
-4. For pressing system keys, use press_key (e.g. home, back, recent).
-5. Always check the device state first if needed (get_device_info).
-6. Use shell commands for complex operations not covered by other tools.
-7. Params must match the exact parameter names and types listed for each tool.
+- For UI tasks, use click_element (AI vision finds and taps the element); take_screenshot when you need to see the current screen.
+- For long-running commands (installs, large downloads, builds), use run_task_and_wait instead of shell.
+- Params must match the exact parameter names and types listed for each tool.
+- If a step fails, try an alternative approach rather than giving up.
+- Keep going until the user's goal is achieved, then respond with done.
 
 Available tools:{tools_text}
 
 Respond ONLY with valid JSON. No markdown, no explanation."""
 
 
-# ========== Main Agent ==========
+# ========== Result summarization ==========
+
+
+def _summarize_result(tool_name: str, result: Any) -> str:
+    """Turn a tool result into a compact text summary for the LLM context."""
+    if not isinstance(result, dict):
+        return str(result)[:2000]
+
+    if result.get("success") is False:
+        err = result.get("error") or result.get("message") or "failed"
+        return f"ERROR: {err}"[:2000]
+
+    if tool_name in ("take_screenshot", "get_screenshot"):
+        data = result.get("data") or {}
+        b64 = data.get("base64", "") or result.get("image_base64", "")
+        return f"screenshot captured ({len(b64)} base64 chars)"
+
+    if tool_name in ("shell", "run_task_and_wait"):
+        out = result.get("stdout") or ""
+        err = result.get("stderr") or ""
+        state = result.get("state") or ""
+        exit_code = result.get("exit_code")
+        text = out or err or str(result)
+        if state:
+            text = f"[state={state} exit={exit_code}] " + text
+        return text[:2000]
+
+    if tool_name in ("find_element", "click_element"):
+        if result.get("success") and result.get("data"):
+            d = result["data"]
+            if d.get("center_x") is not None:
+                return f"found element at ({d.get('center_x')},{d.get('center_y')})"
+        return str(result)[:2000]
+
+    return str(result)[:2000]
+
+
+# ========== LLM client ==========
 
 
 def _get_llm_client():
@@ -203,63 +288,116 @@ def _get_llm_client():
     return None
 
 
-async def process_message(user_text: str, history: list[dict] | None = None) -> dict[str, Any]:
-    """Process a user message, call the LLM, and execute any tool.
+async def _describe_screen(client) -> str:
+    """Capture a screenshot and return a text description of the current screen."""
+    from android_mcp import bridge
 
-    Returns dict with 'reply' (str) and optional 'tool_result' if a tool was called.
+    try:
+        shot = await bridge.get_screenshot()
+        b64 = ""
+        if isinstance(shot, dict):
+            data = shot.get("data") or {}
+            b64 = data.get("base64", "") or shot.get("image_base64", "")
+        if not b64:
+            return ""
+        desc = await client.describe_screenshot(
+            b64,
+            "Briefly describe the current screen: which app/page is shown and the key visible elements.",
+        )
+        return (desc or "")[:1000]
+    except Exception:
+        return ""
+
+
+# ========== Multi-step Agent ==========
+
+
+async def run_agent(
+    goal: str,
+    history: list[dict] | None = None,
+    max_steps: int = 10,
+    visual: bool = True,
+) -> dict[str, Any]:
+    """Run the closed-loop agent until the goal is done or ``max_steps`` reached.
+
+    Returns a dict with ``success``, ``reply``, and ``steps`` (list of steps).
     """
     client = _get_llm_client()
     if client is None:
-        return {
-            "reply": (
-                "AI Chat not configured. Set VISION_PROVIDER and VISION_API_KEY in .env "
-                "to enable AI-powered device control.\n\n"
-                "Supported providers: anthropic, openai, custom"
-            ),
-            "error": True,
-        }
+        msg = (
+            "AI Chat not configured. Set VISION_PROVIDER and VISION_API_KEY in .env "
+            "to enable AI-powered device control.\n\n"
+            "Supported providers: anthropic, openai, custom"
+        )
+        return {"success": False, "reply": msg, "error": msg}
 
-    system_prompt = _build_system_prompt()
-    messages = history or []
-    messages.append({"role": "user", "content": user_text})
+    system_prompt = _build_agent_system_prompt()
+    messages = list(history or [])
+    messages.append({"role": "user", "content": goal})
 
-    try:
-        raw_text = await client.chat(system_prompt, messages)
-    except Exception as e:
-        return {"reply": f"LLM request failed: {e}", "error": True}
+    steps: list[dict[str, Any]] = []
 
-    # Parse LLM response using shared utility
-    try:
-        parsed = parse_json_lenient(raw_text)
-    except Exception:
-        return {"reply": raw_text.strip()}
+    for i in range(max_steps):
+        try:
+            raw_text = await client.chat(system_prompt, messages)
+        except Exception as e:
+            msg = f"LLM request failed: {e}"
+            return {"success": False, "reply": msg, "error": msg, "steps": steps}
 
-    # Text-only reply
-    if "reply" in parsed and "tool" not in parsed:
-        return {"reply": parsed["reply"]}
+        try:
+            parsed = parse_json_lenient(raw_text)
+        except Exception:
+            return {
+                "success": False,
+                "reply": raw_text.strip(),
+                "error": raw_text.strip(),
+                "steps": steps,
+            }
 
-    # Execute tool
-    tool_name = parsed.get("tool", "")
-    params = parsed.get("params", {})
+        # Finished?
+        if parsed.get("done") or ("reply" in parsed and "tool" not in parsed):
+            return {
+                "success": True,
+                "reply": parsed.get("reply") or "Done.",
+                "steps": steps,
+                "done": True,
+            }
 
-    if tool_name not in TOOL_REGISTRY:
-        return {
-            "reply": f"I tried to use '{tool_name}' but it's not available. Available tools: {', '.join(TOOL_REGISTRY.keys())}",
-            "error": True,
-        }
+        tool_name = str(parsed.get("tool", "") or "")
+        params = parsed.get("params", {}) or {}
+        messages.append({"role": "assistant", "content": raw_text})
 
-    fn, _ = TOOL_REGISTRY[tool_name]
-    try:
-        result = await fn(**params)
-        return {
-            "reply": parsed.get("reply", f"Executed {tool_name}"),
-            "tool_called": tool_name,
-            "tool_params": params,
-            "tool_result": result,
-        }
-    except Exception as e:
-        return {
-            "reply": f"Failed to execute {tool_name}: {e}",
-            "tool_called": tool_name,
-            "error": True,
-        }
+        if tool_name not in TOOL_REGISTRY:
+            avail = ", ".join(TOOL_REGISTRY.keys())
+            messages.append({"role": "user", "content": f"[system] unknown tool '{tool_name}'. Available tools: {avail}"})
+            continue
+
+        fn, _ = TOOL_REGISTRY[tool_name]
+        try:
+            result = await fn(**params)
+        except Exception as e:
+            result = {"success": False, "error": str(e)}
+
+        summary = _summarize_result(tool_name, result)
+        steps.append({
+            "step": i + 1,
+            "tool": tool_name,
+            "params": params,
+            "ok": bool(isinstance(result, dict) and result.get("success")),
+            "summary": summary,
+        })
+        messages.append({"role": "user", "content": f"[tool result for {tool_name}] {summary}"})
+
+        # Optional visual verification between steps.
+        if visual and tool_name not in ("take_screenshot", "get_screenshot"):
+            screen_desc = await _describe_screen(client)
+            if screen_desc:
+                messages.append({"role": "user", "content": f"[current screen] {screen_desc}"})
+
+    msg = f"Reached max_steps ({max_steps}) without completing the goal."
+    return {"success": False, "reply": msg, "error": msg, "steps": steps}
+
+
+async def process_message(user_text: str, history: list[dict] | None = None) -> dict[str, Any]:
+    """Backward-compatible entry point — delegates to the multi-step agent."""
+    return await run_agent(user_text, history)

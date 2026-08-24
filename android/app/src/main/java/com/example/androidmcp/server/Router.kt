@@ -6,6 +6,7 @@ import com.example.androidmcp.api.InputApi
 import com.example.androidmcp.api.PackageApi
 import com.example.androidmcp.api.ShellApi
 import com.example.androidmcp.api.SystemApi
+import com.example.androidmcp.api.TaskApi
 import org.json.JSONObject
 
 class Router {
@@ -15,6 +16,7 @@ class Router {
     private val packageApi = PackageApi()
     private val systemApi = SystemApi()
     private val fileApi = FileApi()
+    private val taskApi = TaskApi()
 
     fun handle(request: JSONObject): JSONObject {
         val id = request.opt("id")
@@ -92,6 +94,13 @@ class Router {
             "file.list" -> fileApi.list(params)
             "file.stat" -> fileApi.stat(params)
             "file.delete" -> fileApi.delete(params)
+
+            // Task (long-running background commands)
+            "task.submit" -> taskApi.submit(params)
+            "task.status" -> taskApi.status(params)
+            "task.result" -> taskApi.result(params)
+            "task.cancel" -> taskApi.cancel(params)
+            "task.list" -> taskApi.list(params)
 
             // Device
             "device.reboot" -> systemApi.reboot()

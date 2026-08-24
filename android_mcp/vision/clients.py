@@ -141,6 +141,53 @@ class AnthropicVisionClient:
         ]
         return "\n".join(text_parts).strip()
 
+    async def describe_screenshot(
+        self, base64_image: str, question: str = "Describe the current screen."
+    ) -> str:
+        """Return a free-form text description of a screenshot (multimodal)."""
+        payload = {
+            "model": self.model,
+            "max_tokens": 1024,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "image/png",
+                                "data": base64_image,
+                            },
+                        },
+                        {"type": "text", "text": question},
+                    ],
+                }
+            ],
+        }
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    self.base_url,
+                    json=payload,
+                    headers={
+                        "x-api-key": self.api_key,
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json",
+                    },
+                    timeout=self.timeout,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+            parts = [
+                block.get("text", "")
+                for block in data.get("content", [])
+                if block.get("type") == "text"
+            ]
+            return "\n".join(parts).strip()
+        except Exception:
+            return ""
+
 
 class OpenAIVisionClient:
     """Vision client for OpenAI GPT-4o and OpenAI-compatible endpoints."""
@@ -274,6 +321,49 @@ class OpenAIVisionClient:
         if not choices:
             return ""
         return (choices[0].get("message", {}).get("content", "") or "").strip()
+
+    async def describe_screenshot(
+        self, base64_image: str, question: str = "Describe the current screen."
+    ) -> str:
+        """Return a free-form text description of a screenshot (multimodal)."""
+        payload = {
+            "model": self.model,
+            "max_tokens": 1024,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{base64_image}",
+                                "detail": "high",
+                            },
+                        },
+                        {"type": "text", "text": question},
+                    ],
+                }
+            ],
+        }
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    self.base_url,
+                    json=payload,
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    timeout=self.timeout,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+            choices = data.get("choices", [])
+            if not choices:
+                return ""
+            return (choices[0].get("message", {}).get("content", "") or "").strip()
+        except Exception:
+            return ""
 
 
 def create_vision_client() -> Optional[VisionClient]:

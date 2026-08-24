@@ -80,6 +80,23 @@ object PrivilegeExecutor {
         }
     }
 
+    /**
+     * Execute a command with an explicit timeout (<= 0 means unlimited) and an
+     * optional [onProcess] callback invoked as soon as the process is spawned —
+     * used by [TaskManager] to expose the Process for cancellation.
+     */
+    fun exec(command: String, timeoutMs: Long, onProcess: ((Process) -> Unit)? = null): ExecResult {
+        return when (resolveBackend()) {
+            Backend.ROOT -> RootHelper.exec(command, timeoutMs, onProcess)
+            Backend.SHIZUKU -> ShizukuHelper.exec(command, timeoutMs, onProcess)
+            Backend.NONE -> ExecResult(
+                -1,
+                "",
+                "No privilege backend ready (root unavailable, Shizuku unavailable)"
+            )
+        }
+    }
+
     /** Name of the backend that will actually be used right now: "root" | "shizuku" | "none". */
     fun activeBackendName(): String = resolveBackend().name.lowercase()
 

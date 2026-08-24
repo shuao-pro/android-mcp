@@ -34,15 +34,18 @@ flowchart LR
 
     subgraph SERVER["🐍 Python 服务器 · android_mcp/"]
         direction TB
-        S1["FastMCP<br/>31 个工具 · :9000<br/>/sse + /mcp"]
+        S1["FastMCP<br/>37 个工具 · :9000<br/>/sse + /mcp"]
         S2["Web GUI · FastAPI<br/>:8080 · WebSocket"]
         S3["tools/<br/>薄封装层"]
         S4["bridge/<br/>JSON-RPC 传输层"]
         S5["vision/<br/>AI 元素定位"]
         S6["safety/<br/>风险分级 · 用户确认"]
+        S7["tasks/<br/>提交 · 轮询 · 取结果"]
         S1 --- S3
         S3 --- S4
         S3 --- S6
+        S3 --- S7
+        S7 --- S4
         S2 --- S4
         S2 --- S5
     end
@@ -55,9 +58,12 @@ flowchart LR
         P4["PrivilegeExecutor<br/>AUTO / ROOT / SHIZUKU"]
         P5["Root (su)<br/>UID 0"]
         P6["Shizuku<br/>UID 2000"]
+        P7["TaskApi + TaskManager<br/>异步任务队列"]
         P1 --- P2
         P2 --- P3
+        P2 --- P7
         P3 --- P4
+        P7 --- P4
         P4 --- P5
         P4 --- P6
     end
@@ -76,15 +82,17 @@ flowchart LR
 |------|------|------|----------|
 | **客户端** | Claude Desktop / Kai 9000 / Cherry Studio | 通过 MCP 发送工具调用 | stdio、SSE、Streamable HTTP |
 | | Web 控制台 | 浏览器面板、实时画面、AI 对话 | FastAPI + WebSocket |
-| **Python 服务器** | `server.py`（FastMCP） | 注册 31 个工具，处理 MCP 协议 | FastMCP |
+| **Python 服务器** | `server.py`（FastMCP） | 注册 37 个工具，处理 MCP 协议 | FastMCP |
 | | `bridge/` | 发送 JSON-RPC 到设备，自动 ADB 转发 | httpx、JSON-RPC 2.0 |
 | | `tools/` | 对 `bridge/` 的 `@bridge_call` 薄封装 | 装饰器 |
 | | `safety/` | 风险分级 + 用户确认门控 | MCP elicitation、SAFETY_MODE |
 | | `web/` | 控制台 API、聊天、scrcpy 推流 | FastAPI、uvicorn |
 | | `vision/` | AI 屏幕元素识别 | Claude Vision / GPT-4o |
+| | `tasks/` | 长任务提交 / 轮询 / 取结果 | task.submit/status/result RPC |
 | **Android 应用** | `HttpServer` | 内嵌 HTTP 服务器 :18080，token 鉴权 | Java `ServerSocket` |
 | | `Router` | JSON-RPC 方法分发 | JSON-RPC 2.0 |
-| | `api/*` | Shell、触控、应用、文件、系统操作 | PrivilegeExecutor（Root / Shizuku） |
+| | `api/*` | Shell、触控、应用、文件、系统、任务操作 | PrivilegeExecutor（Root / Shizuku） |
+| | `TaskManager` / `TaskApi` | 后台任务队列 + JSON-RPC API | 线程池、任务状态机 |
 | | `util/` | 特权执行器 + token 存储 | `PrivilegeExecutor`、`RootHelper`、`ShizukuHelper`、`TokenStore` |
 
 ### 请求生命周期
@@ -114,7 +122,7 @@ flowchart LR
 > 💡 服务器可直接在手机上运行（Termux / Kai 9000）。设置 `ANDROID_HOST=127.0.0.1` — 无需 ADB。
 ## 功能特性
 
-### 设备控制（31 个 MCP 工具）
+### 设备控制（37 个 MCP 工具）
 
 | 分类 | 工具 |
 |------|------|
@@ -126,6 +134,7 @@ flowchart LR
 | **文件** | `read_file`、`write_file`（支持 `/data/data` 受限目录） |
 | **系统** | `get_system_setting`、`put_system_setting`、`set_clipboard`、`get_clipboard`、`get_notifications`、`start_activity` |
 | **特权模式** | `get_privilege_mode`、`set_privilege_mode` — 切换设备执行后端（auto / shizuku / root） |
+| **长任务** | `submit_task`、`get_task_status`、`get_task_result`、`cancel_task`、`list_tasks`、`run_task_and_wait` — 把长命令跑成后台任务 |
 | **AI 视觉** | `find_element` — AI 定位屏幕元素，`click_element` — 识别+点击一步完成 |
 
 ### 🛡️ 权限审查（安全防护）
@@ -150,6 +159,18 @@ Android 应用通过统一的 **PrivilegeExecutor** 执行命令，支持三种�
 
 可在 Android App 界面、Web 控制台，或通过 `set_privilege_mode` MCP 工具切换。
 
+### ⏳ 长任务异步执行
+
+可能超过 30 秒 HTTP 超时的命令，会作为后台异步任务在设备上运行：
+
+- `submit_task` / `run_task_and_wait` — 后台运行命令并轮询直到结束
+- `get_task_status` / `get_task_result` / `cancel_task` / `list_tasks` — 监控与取消任务
+- 设备端 `TaskManager` 用独立线程池（10 并发）运行命令，输出截断 + 自动清理
+
+### 🤖 多步智能体
+
+Web 控制台的 AI 对话采用闭环智能体：串联多个工具调用（截图 + 视觉校验、长任务、失败重试）直到目标完成 —— 最多 10 步。
+
 ### AI 视觉
 
 - 接入 Claude Vision / GPT-4o / 自定义 API 进行屏幕元素识别
@@ -158,7 +179,7 @@ Android 应用通过统一的 **PrivilegeExecutor** 执行命令，支持三种�
 
 ### Web 控制台
 
-- **AI 对话** — 输入"打开设置"、"点击搜索图标"即可操控手机
+- **AI 对话** — 多步智能体：描述目标，自动串联工具调用（截图+视觉校验、长任务、失败重试）直到完成
 - **实时画面** — 10fps WebSocket 推流，点击画面直接触控
 - **scrcpy 投屏** — 一键启动原生低延迟投屏窗口
 - **连接向导** — 5 步引导式配置，自动检测前置条件 + 显示 MCP SSE 地址
