@@ -19,106 +19,6 @@ Control an Android phone with natural language — through Claude Desktop, Cherr
 
 ---
 
-## 🏗️ Architecture
-
-Three layers cooperate to turn a natural-language request into system-level actions on the device:
-
-```mermaid
-flowchart LR
-    subgraph CLIENTS["🤖 MCP Clients"]
-        direction TB
-        C1["Claude Desktop<br/>stdio / SSE"]
-        C2["Kai 9000<br/>Streamable HTTP"]
-        C3["Cherry Studio<br/>Streamable HTTP"]
-        C4["Web Dashboard<br/>browser · :8080"]
-    end
-
-    subgraph SERVER["🐍 Python Server · android_mcp/"]
-        direction TB
-        S1["FastMCP<br/>37 tools · :9000<br/>/sse + /mcp"]
-        S2["Web GUI · FastAPI<br/>:8080 · WebSocket"]
-        S3["tools/<br/>thin wrappers"]
-        S4["bridge/<br/>JSON-RPC transport"]
-        S5["vision/<br/>AI element locator"]
-        S6["safety/<br/>risk gate · user confirm"]
-        S7["tasks/<br/>submit · poll · result"]
-        S1 --- S3
-        S3 --- S4
-        S3 --- S6
-        S3 --- S7
-        S7 --- S4
-        S2 --- S4
-        S2 --- S5
-    end
-
-    subgraph PHONE["📱 Android App · Kotlin · Root / Shizuku"]
-        direction TB
-        P1["HttpServer<br/>:18080"]
-        P2["Router<br/>JSON-RPC dispatch"]
-        P3["api/<br/>shell · input · file · system"]
-        P4["PrivilegeExecutor<br/>AUTO / ROOT / SHIZUKU"]
-        P5["Root (su)<br/>UID 0"]
-        P6["Shizuku<br/>UID 2000"]
-        P7["TaskApi + TaskManager<br/>async task queue"]
-        P1 --- P2
-        P2 --- P3
-        P2 --- P7
-        P3 --- P4
-        P7 --- P4
-        P4 --- P5
-        P4 --- P6
-    end
-
-    C1 --> S1
-    C2 --> S1
-    C3 --> S1
-    C4 --> S2
-    S4 -->|"HTTP JSON-RPC · X-MCP-Token<br/>ADB forward tcp:18080"| P1
-    S5 -.->|"Claude Vision / GPT-4o"| V["🧠 Vision API"]
-```
-
-### Component breakdown
-
-| Layer | Component | Responsibility | Key tech |
-|-------|-----------|----------------|----------|
-| **Clients** | Claude Desktop / Kai 9000 / Cherry Studio | Send tool calls as MCP messages | stdio, SSE, Streamable HTTP |
-| | Web Dashboard | Browser panel, live screen, AI chat | FastAPI + WebSocket |
-| **Python server** | `server.py` (FastMCP) | Registers 37 tools, speaks MCP | FastMCP |
-| | `bridge/` | JSON-RPC → device, auto ADB forward | httpx, JSON-RPC 2.0 |
-| | `tools/` | Thin `@bridge_call` wrappers | decorators |
-| | `safety/` | Risk classification + user confirmation gate | MCP elicitation, SAFETY_MODE |
-| | `web/` | Dashboard API, chat, scrcpy stream | FastAPI, uvicorn |
-| | `vision/` | AI screen-element recognition | Claude Vision / GPT-4o |
-| | `tasks/` | Long-running task submit / poll / result | task.submit/status/result RPC |
-| **Android app** | `HttpServer` | Embedded HTTP server :18080, token auth | Java `ServerSocket` |
-| | `Router` | JSON-RPC method dispatch | JSON-RPC 2.0 |
-| | `api/*` | Shell, input, package, file, system, task | PrivilegeExecutor (Root / Shizuku) |
-| | `TaskManager` / `TaskApi` | Background task queue + JSON-RPC API | thread pool, task state machine |
-| | `util/` | Privilege executor + token store | `PrivilegeExecutor`, `RootHelper`, `ShizukuHelper`, `TokenStore` |
-
-### Request lifecycle
-
-Every tool call follows one path — e.g. `click(x, y)`:
-
-1. **Client** sends `click(x, y)` over MCP (`:9000`) or the Web Dashboard (`:8080`).
-2. **FastMCP / FastAPI** routes it to the matching `tools/` wrapper.
-3. **`safety/`** classifies the operation; high-risk commands (destructive shell, writes to protected paths, app uninstall/clear) trigger an interactive user confirmation via MCP elicitation before continuing.
-4. **`bridge/_core.py`** serializes it as a JSON-RPC 2.0 request, attaches the `X-MCP-Token` header, and POSTs to `http://127.0.0.1:18080/mcp` (re-establishing the ADB forward if needed).
-5. **`HttpServer`** authenticates the token, then hands the request to `Router`.
-6. **`Router`** dispatches to the right `api/*` module (e.g. `InputApi.tap`), which runs it via **Shizuku** (UID 2000) or **Root** (su, UID 0) — no root required, but rooted devices get full root access.
-7. The JSON-RPC result travels back up the same chain.
-
-### Ports & transports
-
-| Port | Service | Transport | Consumers |
-|------|---------|-----------|-----------|
-| `:9000/sse` | MCP (SSE) | HTTP SSE | Claude Desktop (remote), web frontends |
-| `:9000/mcp` | MCP (Streamable HTTP) | HTTP POST/GET | Kai 9000, Cherry Studio |
-| `:8080` | Web Dashboard | HTTP + WebSocket | Browser |
-| `:18080` | Android bridge | HTTP JSON-RPC (ADB-forwarded) | Python `bridge/` |
-| *(stdio)* | MCP (stdio) | local pipe | Claude Desktop (local) |
-
-> 💡 The server can run on the phone itself (Termux / Kai 9000). Set `ANDROID_HOST=127.0.0.1` — no ADB needed.
 ## ✨ Features
 
 ### Device Control (37 MCP Tools)
@@ -210,14 +110,7 @@ Connect any MCP-compatible client to the server:
 | Streamable HTTP | `:9000/mcp` | Kai 9000, modern MCP clients |
 | **Combined** (default) | **both on `:9000`** | **SSE + Streamable HTTP simultaneously** |
 
-
-## 🔗 Links
-
-| Resource | URL |
-|----------|-----|
-| **GitHub** | [github.com/shuao-pro/android-mcp](https://github.com/shuao-pro/android-mcp) |
-| **Issues** | [Report a bug / Request feature](https://github.com/shuao-pro/android-mcp/issues) |
-| **README 中文** | [README_zh.md](./README_zh.md) |
+---
 
 ## 🚀 Quick Start
 
@@ -337,6 +230,109 @@ VISION_API_BASE=                # only for custom provider
 
 ---
 
+## 🏗️ Architecture
+
+Three layers cooperate to turn a natural-language request into system-level actions on the device:
+
+```mermaid
+flowchart LR
+    subgraph CLIENTS["🤖 MCP Clients"]
+        direction TB
+        C1["Claude Desktop<br/>stdio / SSE"]
+        C2["Kai 9000<br/>Streamable HTTP"]
+        C3["Cherry Studio<br/>Streamable HTTP"]
+        C4["Web Dashboard<br/>browser · :8080"]
+    end
+
+    subgraph SERVER["🐍 Python Server · android_mcp/"]
+        direction TB
+        S1["FastMCP<br/>37 tools · :9000<br/>/sse + /mcp"]
+        S2["Web GUI · FastAPI<br/>:8080 · WebSocket"]
+        S3["tools/<br/>thin wrappers"]
+        S4["bridge/<br/>JSON-RPC transport"]
+        S5["vision/<br/>AI element locator"]
+        S6["safety/<br/>risk gate · user confirm"]
+        S7["tasks/<br/>submit · poll · result"]
+        S1 --- S3
+        S3 --- S4
+        S3 --- S6
+        S3 --- S7
+        S7 --- S4
+        S2 --- S4
+        S2 --- S5
+    end
+
+    subgraph PHONE["📱 Android App · Kotlin · Root / Shizuku"]
+        direction TB
+        P1["HttpServer<br/>:18080"]
+        P2["Router<br/>JSON-RPC dispatch"]
+        P3["api/<br/>shell · input · file · system"]
+        P4["PrivilegeExecutor<br/>AUTO / ROOT / SHIZUKU"]
+        P5["Root (su)<br/>UID 0"]
+        P6["Shizuku<br/>UID 2000"]
+        P7["TaskApi + TaskManager<br/>async task queue"]
+        P1 --- P2
+        P2 --- P3
+        P2 --- P7
+        P3 --- P4
+        P7 --- P4
+        P4 --- P5
+        P4 --- P6
+    end
+
+    C1 --> S1
+    C2 --> S1
+    C3 --> S1
+    C4 --> S2
+    S4 -->|"HTTP JSON-RPC · X-MCP-Token<br/>ADB forward tcp:18080"| P1
+    S5 -.->|"Claude Vision / GPT-4o"| V["🧠 Vision API"]
+```
+
+### Component breakdown
+
+| Layer | Component | Responsibility | Key tech |
+|-------|-----------|----------------|----------|
+| **Clients** | Claude Desktop / Kai 9000 / Cherry Studio | Send tool calls as MCP messages | stdio, SSE, Streamable HTTP |
+| | Web Dashboard | Browser panel, live screen, AI chat | FastAPI + WebSocket |
+| **Python server** | `server.py` (FastMCP) | Registers 37 tools, speaks MCP | FastMCP |
+| | `bridge/` | JSON-RPC → device, auto ADB forward | httpx, JSON-RPC 2.0 |
+| | `tools/` | Thin `@bridge_call` wrappers | decorators |
+| | `safety/` | Risk classification + user confirmation gate | MCP elicitation, SAFETY_MODE |
+| | `web/` | Dashboard API, chat, scrcpy stream | FastAPI, uvicorn |
+| | `vision/` | AI screen-element recognition | Claude Vision / GPT-4o |
+| | `tasks/` | Long-running task submit / poll / result | task.submit/status/result RPC |
+| **Android app** | `HttpServer` | Embedded HTTP server :18080, token auth | Java `ServerSocket` |
+| | `Router` | JSON-RPC method dispatch | JSON-RPC 2.0 |
+| | `api/*` | Shell, input, package, file, system, task | PrivilegeExecutor (Root / Shizuku) |
+| | `TaskManager` / `TaskApi` | Background task queue + JSON-RPC API | thread pool, task state machine |
+| | `util/` | Privilege executor + token store | `PrivilegeExecutor`, `RootHelper`, `ShizukuHelper`, `TokenStore` |
+
+### Request lifecycle
+
+Every tool call follows one path — e.g. `click(x, y)`:
+
+1. **Client** sends `click(x, y)` over MCP (`:9000`) or the Web Dashboard (`:8080`).
+2. **FastMCP / FastAPI** routes it to the matching `tools/` wrapper.
+3. **`safety/`** classifies the operation; high-risk commands (destructive shell, writes to protected paths, app uninstall/clear) trigger an interactive user confirmation via MCP elicitation before continuing.
+4. **`bridge/_core.py`** serializes it as a JSON-RPC 2.0 request, attaches the `X-MCP-Token` header, and POSTs to `http://127.0.0.1:18080/mcp` (re-establishing the ADB forward if needed).
+5. **`HttpServer`** authenticates the token, then hands the request to `Router`.
+6. **`Router`** dispatches to the right `api/*` module (e.g. `InputApi.tap`), which runs it via **Shizuku** (UID 2000) or **Root** (su, UID 0) — no root required, but rooted devices get full root access.
+7. The JSON-RPC result travels back up the same chain.
+
+### Ports & transports
+
+| Port | Service | Transport | Consumers |
+|------|---------|-----------|-----------|
+| `:9000/sse` | MCP (SSE) | HTTP SSE | Claude Desktop (remote), web frontends |
+| `:9000/mcp` | MCP (Streamable HTTP) | HTTP POST/GET | Kai 9000, Cherry Studio |
+| `:8080` | Web Dashboard | HTTP + WebSocket | Browser |
+| `:18080` | Android bridge | HTTP JSON-RPC (ADB-forwarded) | Python `bridge/` |
+| *(stdio)* | MCP (stdio) | local pipe | Claude Desktop (local) |
+
+> 💡 The server can run on the phone itself (Termux / Kai 9000). Set `ANDROID_HOST=127.0.0.1` — no ADB needed.
+
+---
+
 ## 🖥️ CLI Commands
 
 ```bash
@@ -353,6 +349,8 @@ python -m android_mcp.gateway status        # Check status
 python -m android_mcp.gateway stop          # Stop daemon
 python -m android_mcp.gateway forward       # Set up ADB port forward
 ```
+
+---
 
 ## 📁 Project Structure
 
@@ -444,6 +442,16 @@ android-mcp/
 | scrcpy | Optional (native mirroring) |
 | AI Vision | Anthropic/OpenAI API key (optional) |
 | MCP Client | Kai 9000 (F-Droid), Claude Desktop, or any SSE/stdio MCP client |
+
+---
+
+## 🔗 Links
+
+| Resource | URL |
+|----------|-----|
+| **GitHub** | [github.com/shuao-pro/android-mcp](https://github.com/shuao-pro/android-mcp) |
+| **Issues** | [Report a bug / Request feature](https://github.com/shuao-pro/android-mcp/issues) |
+| **README 中文** | [README_zh.md](./README_zh.md) |
 
 ---
 

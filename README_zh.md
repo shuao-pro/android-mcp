@@ -18,108 +18,6 @@
 
 ---
 
-## 🏗️ 架构
-
-三个层级协同工作，把自然语言请求转化为设备上的系统级操作：
-
-```mermaid
-flowchart LR
-    subgraph CLIENTS["🤖 MCP 客户端"]
-        direction TB
-        C1["Claude Desktop<br/>stdio / SSE"]
-        C2["Kai 9000<br/>Streamable HTTP"]
-        C3["Cherry Studio<br/>Streamable HTTP"]
-        C4["Web 控制台<br/>浏览器 · :8080"]
-    end
-
-    subgraph SERVER["🐍 Python 服务器 · android_mcp/"]
-        direction TB
-        S1["FastMCP<br/>37 个工具 · :9000<br/>/sse + /mcp"]
-        S2["Web GUI · FastAPI<br/>:8080 · WebSocket"]
-        S3["tools/<br/>薄封装层"]
-        S4["bridge/<br/>JSON-RPC 传输层"]
-        S5["vision/<br/>AI 元素定位"]
-        S6["safety/<br/>风险分级 · 用户确认"]
-        S7["tasks/<br/>提交 · 轮询 · 取结果"]
-        S1 --- S3
-        S3 --- S4
-        S3 --- S6
-        S3 --- S7
-        S7 --- S4
-        S2 --- S4
-        S2 --- S5
-    end
-
-    subgraph PHONE["📱 Android 应用 · Kotlin · Root / Shizuku"]
-        direction TB
-        P1["HttpServer<br/>:18080"]
-        P2["Router<br/>JSON-RPC 分发"]
-        P3["api/<br/>shell · input · file · system"]
-        P4["PrivilegeExecutor<br/>AUTO / ROOT / SHIZUKU"]
-        P5["Root (su)<br/>UID 0"]
-        P6["Shizuku<br/>UID 2000"]
-        P7["TaskApi + TaskManager<br/>异步任务队列"]
-        P1 --- P2
-        P2 --- P3
-        P2 --- P7
-        P3 --- P4
-        P7 --- P4
-        P4 --- P5
-        P4 --- P6
-    end
-
-    C1 --> S1
-    C2 --> S1
-    C3 --> S1
-    C4 --> S2
-    S4 -->|"HTTP JSON-RPC · X-MCP-Token<br/>ADB 转发 tcp:18080"| P1
-    S5 -.->|"Claude Vision / GPT-4o"| V["🧠 视觉 API"]
-```
-
-### 组件说明
-
-| 层级 | 组件 | 职责 | 关键技术 |
-|------|------|------|----------|
-| **客户端** | Claude Desktop / Kai 9000 / Cherry Studio | 通过 MCP 发送工具调用 | stdio、SSE、Streamable HTTP |
-| | Web 控制台 | 浏览器面板、实时画面、AI 对话 | FastAPI + WebSocket |
-| **Python 服务器** | `server.py`（FastMCP） | 注册 37 个工具，处理 MCP 协议 | FastMCP |
-| | `bridge/` | 发送 JSON-RPC 到设备，自动 ADB 转发 | httpx、JSON-RPC 2.0 |
-| | `tools/` | 对 `bridge/` 的 `@bridge_call` 薄封装 | 装饰器 |
-| | `safety/` | 风险分级 + 用户确认门控 | MCP elicitation、SAFETY_MODE |
-| | `web/` | 控制台 API、聊天、scrcpy 推流 | FastAPI、uvicorn |
-| | `vision/` | AI 屏幕元素识别 | Claude Vision / GPT-4o |
-| | `tasks/` | 长任务提交 / 轮询 / 取结果 | task.submit/status/result RPC |
-| **Android 应用** | `HttpServer` | 内嵌 HTTP 服务器 :18080，token 鉴权 | Java `ServerSocket` |
-| | `Router` | JSON-RPC 方法分发 | JSON-RPC 2.0 |
-| | `api/*` | Shell、触控、应用、文件、系统、任务操作 | PrivilegeExecutor（Root / Shizuku） |
-| | `TaskManager` / `TaskApi` | 后台任务队列 + JSON-RPC API | 线程池、任务状态机 |
-| | `util/` | 特权执行器 + token 存储 | `PrivilegeExecutor`、`RootHelper`、`ShizukuHelper`、`TokenStore` |
-
-### 请求生命周期
-
-每个工具调用都走同一条链路 —— 以 `click(x, y)` 为例：
-
-1. **客户端** 通过 MCP（`:9000`）或 Web 控制台（`:8080`）发送 `click(x, y)`。
-2. **FastMCP / FastAPI** 将其路由到 `tools/` 中对应的封装函数。
-3. **`safety/`** 对操作进行风险分级；高危命令（破坏性 shell、写入受保护路径、卸载/清除应用等）会通过 MCP elicitation 触发用户交互式确认，同意后才继续。
-4. **`bridge/_core.py`** 序列化为 JSON-RPC 2.0 请求，附带 `X-MCP-Token` 头，POST 到 `http://127.0.0.1:18080/mcp`（必要时自动重建 ADB 转发）。
-5. **`HttpServer`** 校验 token 后，交给 `Router`。
-6. **`Router`** 分发到对应的 `api/*` 模块（如 `InputApi.tap`），通过 **Shizuku**（UID 2000）或 **Root**（su，UID 0）执行 —— 无需 root 即可使用，root 设备可获得完整 root 权限。
-7. JSON-RPC 结果沿原链路返回给调用方。
-
-### 端口与传输
-
-| 端口 | 服务 | 传输方式 | 使用者 |
-|------|------|----------|--------|
-| `:9000/sse` | MCP（SSE） | HTTP SSE | Claude Desktop（远程）、Web 前端 |
-| `:9000/mcp` | MCP（Streamable HTTP） | HTTP POST/GET | Kai 9000、Cherry Studio |
-| `:8080` | Web 控制台 | HTTP + WebSocket | 浏览器 |
-| `:18080` | Android 桥接 | HTTP JSON-RPC（ADB 转发） | Python `bridge/` |
-| *(stdio)* | MCP（stdio） | 本地管道 | Claude Desktop（本地） |
-
-> 🔒 **通信鉴权**：Python 网关 ↔ Android 应用通过共享 `X-MCP-Token` 统一鉴权。App 随机生成 token 并显示在界面，复制到 `.env` 的 `ANDROID_TOKEN=` 即可。默认 `MCP_HOST=127.0.0.1`（仅本机访问）。
-
-> 💡 服务器可直接在手机上运行（Termux / Kai 9000）。设置 `ANDROID_HOST=127.0.0.1` — 无需 ADB。
 ## 功能特性
 
 ### 设备控制（37 个 MCP 工具）
@@ -212,17 +110,6 @@ Web 控制台的 AI 对话采用闭环智能体：串联多个工具调用（截
 | **Combined**（默认） | **两者同端口 `:9000`** | **SSE + Streamable HTTP 同时运行** |
 
 ---
-
-
----
-
-## 🔗 链接
-
-| 资源 | URL |
-|------|-----|
-| **GitHub** | [github.com/shuao-pro/android-mcp](https://github.com/shuao-pro/android-mcp) |
-| **Issues** | [报告问题 / 请求功能](https://github.com/shuao-pro/android-mcp/issues) |
-| **README English** | [README.md](./README.md) |
 
 ## 快速开始
 
@@ -339,6 +226,111 @@ VISION_API_BASE=                # 仅 custom 供应商需要
 
 ---
 
+## 🏗️ 架构
+
+三个层级协同工作，把自然语言请求转化为设备上的系统级操作：
+
+```mermaid
+flowchart LR
+    subgraph CLIENTS["🤖 MCP 客户端"]
+        direction TB
+        C1["Claude Desktop<br/>stdio / SSE"]
+        C2["Kai 9000<br/>Streamable HTTP"]
+        C3["Cherry Studio<br/>Streamable HTTP"]
+        C4["Web 控制台<br/>浏览器 · :8080"]
+    end
+
+    subgraph SERVER["🐍 Python 服务器 · android_mcp/"]
+        direction TB
+        S1["FastMCP<br/>37 个工具 · :9000<br/>/sse + /mcp"]
+        S2["Web GUI · FastAPI<br/>:8080 · WebSocket"]
+        S3["tools/<br/>薄封装层"]
+        S4["bridge/<br/>JSON-RPC 传输层"]
+        S5["vision/<br/>AI 元素定位"]
+        S6["safety/<br/>风险分级 · 用户确认"]
+        S7["tasks/<br/>提交 · 轮询 · 取结果"]
+        S1 --- S3
+        S3 --- S4
+        S3 --- S6
+        S3 --- S7
+        S7 --- S4
+        S2 --- S4
+        S2 --- S5
+    end
+
+    subgraph PHONE["📱 Android 应用 · Kotlin · Root / Shizuku"]
+        direction TB
+        P1["HttpServer<br/>:18080"]
+        P2["Router<br/>JSON-RPC 分发"]
+        P3["api/<br/>shell · input · file · system"]
+        P4["PrivilegeExecutor<br/>AUTO / ROOT / SHIZUKU"]
+        P5["Root (su)<br/>UID 0"]
+        P6["Shizuku<br/>UID 2000"]
+        P7["TaskApi + TaskManager<br/>异步任务队列"]
+        P1 --- P2
+        P2 --- P3
+        P2 --- P7
+        P3 --- P4
+        P7 --- P4
+        P4 --- P5
+        P4 --- P6
+    end
+
+    C1 --> S1
+    C2 --> S1
+    C3 --> S1
+    C4 --> S2
+    S4 -->|"HTTP JSON-RPC · X-MCP-Token<br/>ADB 转发 tcp:18080"| P1
+    S5 -.->|"Claude Vision / GPT-4o"| V["🧠 视觉 API"]
+```
+
+### 组件说明
+
+| 层级 | 组件 | 职责 | 关键技术 |
+|------|------|------|----------|
+| **客户端** | Claude Desktop / Kai 9000 / Cherry Studio | 通过 MCP 发送工具调用 | stdio、SSE、Streamable HTTP |
+| | Web 控制台 | 浏览器面板、实时画面、AI 对话 | FastAPI + WebSocket |
+| **Python 服务器** | `server.py`（FastMCP） | 注册 37 个工具，处理 MCP 协议 | FastMCP |
+| | `bridge/` | 发送 JSON-RPC 到设备，自动 ADB 转发 | httpx、JSON-RPC 2.0 |
+| | `tools/` | 对 `bridge/` 的 `@bridge_call` 薄封装 | 装饰器 |
+| | `safety/` | 风险分级 + 用户确认门控 | MCP elicitation、SAFETY_MODE |
+| | `web/` | 控制台 API、聊天、scrcpy 推流 | FastAPI、uvicorn |
+| | `vision/` | AI 屏幕元素识别 | Claude Vision / GPT-4o |
+| | `tasks/` | 长任务提交 / 轮询 / 取结果 | task.submit/status/result RPC |
+| **Android 应用** | `HttpServer` | 内嵌 HTTP 服务器 :18080，token 鉴权 | Java `ServerSocket` |
+| | `Router` | JSON-RPC 方法分发 | JSON-RPC 2.0 |
+| | `api/*` | Shell、触控、应用、文件、系统、任务操作 | PrivilegeExecutor（Root / Shizuku） |
+| | `TaskManager` / `TaskApi` | 后台任务队列 + JSON-RPC API | 线程池、任务状态机 |
+| | `util/` | 特权执行器 + token 存储 | `PrivilegeExecutor`、`RootHelper`、`ShizukuHelper`、`TokenStore` |
+
+### 请求生命周期
+
+每个工具调用都走同一条链路 —— 以 `click(x, y)` 为例：
+
+1. **客户端** 通过 MCP（`:9000`）或 Web 控制台（`:8080`）发送 `click(x, y)`。
+2. **FastMCP / FastAPI** 将其路由到 `tools/` 中对应的封装函数。
+3. **`safety/`** 对操作进行风险分级；高危命令（破坏性 shell、写入受保护路径、卸载/清除应用等）会通过 MCP elicitation 触发用户交互式确认，同意后才继续。
+4. **`bridge/_core.py`** 序列化为 JSON-RPC 2.0 请求，附带 `X-MCP-Token` 头，POST 到 `http://127.0.0.1:18080/mcp`（必要时自动重建 ADB 转发）。
+5. **`HttpServer`** 校验 token 后，交给 `Router`。
+6. **`Router`** 分发到对应的 `api/*` 模块（如 `InputApi.tap`），通过 **Shizuku**（UID 2000）或 **Root**（su，UID 0）执行 —— 无需 root 即可使用，root 设备可获得完整 root 权限。
+7. JSON-RPC 结果沿原链路返回给调用方。
+
+### 端口与传输
+
+| 端口 | 服务 | 传输方式 | 使用者 |
+|------|------|----------|--------|
+| `:9000/sse` | MCP（SSE） | HTTP SSE | Claude Desktop（远程）、Web 前端 |
+| `:9000/mcp` | MCP（Streamable HTTP） | HTTP POST/GET | Kai 9000、Cherry Studio |
+| `:8080` | Web 控制台 | HTTP + WebSocket | 浏览器 |
+| `:18080` | Android 桥接 | HTTP JSON-RPC（ADB 转发） | Python `bridge/` |
+| *(stdio)* | MCP（stdio） | 本地管道 | Claude Desktop（本地） |
+
+> 🔒 **通信鉴权**：Python 网关 ↔ Android 应用通过共享 `X-MCP-Token` 统一鉴权。App 随机生成 token 并显示在界面，复制到 `.env` 的 `ANDROID_TOKEN=` 即可。默认 `MCP_HOST=127.0.0.1`（仅本机访问）。
+
+> 💡 服务器可直接在手机上运行（Termux / Kai 9000）。设置 `ANDROID_HOST=127.0.0.1` — 无需 ADB。
+
+---
+
 ## CLI 命令
 
 ```bash
@@ -355,6 +347,8 @@ python -m android_mcp.gateway status        # 查看状态
 python -m android_mcp.gateway stop          # 停止服务
 python -m android_mcp.gateway forward       # ADB 端口转发
 ```
+
+---
 
 ## 项目结构
 
@@ -446,6 +440,16 @@ android-mcp/
 | scrcpy | 可选（原生投屏） |
 | AI 视觉 | Anthropic/OpenAI API Key（可选） |
 | MCP 客户端 | Kai 9000（F-Droid）、Claude Desktop、或任意 SSE/stdio MCP 客户端 |
+
+---
+
+## 🔗 链接
+
+| 资源 | URL |
+|------|-----|
+| **GitHub** | [github.com/shuao-pro/android-mcp](https://github.com/shuao-pro/android-mcp) |
+| **Issues** | [报告问题 / 请求功能](https://github.com/shuao-pro/android-mcp/issues) |
+| **README English** | [README.md](./README.md) |
 
 ---
 
