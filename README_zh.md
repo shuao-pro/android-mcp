@@ -461,6 +461,23 @@ android-mcp/
 | [httpx](https://github.com/encode/httpx) | 设备桥接的异步 HTTP 客户端 | BSD-3-Clause |
 | [scrcpy](https://github.com/Genymobile/scrcpy) | 低延迟投屏 | Apache-2.0 |
 
+**MCP 客户端：**
+
+| 项目 | 用途 | 许可证 |
+|------|------|--------|
+| [Kai 9000](https://f-droid.org) | Android MCP 客户端（F-Droid 分发） | — |
+| [Cherry Studio](https://github.com/CherryHQ/cherry-studio) | 桌面 AI 助手 / MCP 客户端 | AGPL-3.0 |
+| [Termux](https://github.com/termux/termux-app) | Android 终端（可在设备上运行服务端） | GPL-3.0 |
+
+**Root 管理器：**
+
+| 项目 | 用途 | 许可证 |
+|------|------|--------|
+| [Magisk](https://github.com/topjohnwu/Magisk) | Systemless Root 方案 | GPL-3.0 |
+| [KernelSU](https://github.com/tiann/KernelSU) | 基于内核的 Root 方案 | GPL-2.0 |
+| [APatch](https://github.com/bmax121/APatch) | 内核补丁 Root 方案 | GPL-3.0 |
+| [SuperSU](https://en.wikipedia.org/wiki/SuperSU) | 经典 Root 管理（已停更） | Apache-2.0 |
+
 ---
 
 ## 许可证

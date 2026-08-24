@@ -459,6 +459,23 @@ This project builds on the following open-source projects:
 | [httpx](https://github.com/encode/httpx) | Async HTTP client for the device bridge | BSD-3-Clause |
 | [scrcpy](https://github.com/Genymobile/scrcpy) | Low-latency screen mirroring | Apache-2.0 |
 
+**MCP clients:**
+
+| Project | Purpose | License |
+|---------|---------|---------|
+| [Kai 9000](https://f-droid.org) | Android MCP client (distributed on F-Droid) | — |
+| [Cherry Studio](https://github.com/CherryHQ/cherry-studio) | Desktop AI assistant / MCP client | AGPL-3.0 |
+| [Termux](https://github.com/termux/termux-app) | Android terminal (run the server on-device) | GPL-3.0 |
+
+**Root managers:**
+
+| Project | Purpose | License |
+|---------|---------|---------|
+| [Magisk](https://github.com/topjohnwu/Magisk) | Systemless root solution | GPL-3.0 |
+| [KernelSU](https://github.com/tiann/KernelSU) | Kernel-based root solution | GPL-2.0 |
+| [APatch](https://github.com/bmax121/APatch) | Kernel-patch root solution | GPL-3.0 |
+| [SuperSU](https://en.wikipedia.org/wiki/SuperSU) | Classic root management (discontinued) | Apache-2.0 |
+
 ---
 
 ## 📄 License
