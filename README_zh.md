@@ -449,6 +449,20 @@ android-mcp/
 
 ---
 
+## 引用项目
+
+本项目基于以下开源项目构建：
+
+| 项目 | 用途 | 许可证 |
+|------|------|--------|
+| [Shizuku](https://github.com/RikkaApps/Shizuku) | Android 特权 Shell 执行（无需 root） | Apache-2.0 |
+| [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) | Model Context Protocol 服务端（FastMCP） | MIT |
+| [FastAPI](https://github.com/fastapi/fastapi) | Web 控制台后端 | MIT |
+| [httpx](https://github.com/encode/httpx) | 设备桥接的异步 HTTP 客户端 | BSD-3-Clause |
+| [scrcpy](https://github.com/Genymobile/scrcpy) | 低延迟投屏 | Apache-2.0 |
+
+---
+
 ## 许可证
 
 MIT

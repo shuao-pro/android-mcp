@@ -447,6 +447,20 @@ android-mcp/
 
 ---
 
+## 🙏 References
+
+This project builds on the following open-source projects:
+
+| Project | Purpose | License |
+|---------|---------|---------|
+| [Shizuku](https://github.com/RikkaApps/Shizuku) | Privileged shell execution on Android (no root) | Apache-2.0 |
+| [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) | Model Context Protocol server (FastMCP) | MIT |
+| [FastAPI](https://github.com/fastapi/fastapi) | Web GUI backend | MIT |
+| [httpx](https://github.com/encode/httpx) | Async HTTP client for the device bridge | BSD-3-Clause |
+| [scrcpy](https://github.com/Genymobile/scrcpy) | Low-latency screen mirroring | Apache-2.0 |
+
+---
+
 ## 📄 License
 
 MIT
