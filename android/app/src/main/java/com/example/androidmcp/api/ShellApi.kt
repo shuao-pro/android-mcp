@@ -1,6 +1,6 @@
 package com.example.androidmcp.api
 
-import com.example.androidmcp.util.ShizukuHelper
+import com.example.androidmcp.util.PrivilegeExecutor
 import org.json.JSONObject
 
 class ShellApi {
@@ -12,7 +12,7 @@ class ShellApi {
         }
 
         val timeout = params.optInt("timeout", 30)
-        val result = ShizukuHelper.exec(command)
+        val result = PrivilegeExecutor.exec(command)
 
         return JSONObject().apply {
             put("exitCode", result.exitCode)

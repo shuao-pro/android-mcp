@@ -1,6 +1,6 @@
 package com.example.androidmcp.api
 
-import com.example.androidmcp.util.ShizukuHelper
+import com.example.androidmcp.util.PrivilegeExecutor
 import org.json.JSONObject
 
 class InputApi {
@@ -10,7 +10,7 @@ class InputApi {
         val y = params.optInt("y", -1)
         if (x < 0 || y < 0) throw IllegalArgumentException("x and y required")
 
-        val result = ShizukuHelper.exec("input tap $x $y")
+        val result = PrivilegeExecutor.exec("input tap $x $y")
         return JSONObject().apply {
             put("success", result.isSuccess)
             put("stdout", result.stdout)
@@ -24,7 +24,7 @@ class InputApi {
         val duration = params.optInt("duration", 1000)
         if (x < 0 || y < 0) throw IllegalArgumentException("x and y required")
 
-        val result = ShizukuHelper.exec("input swipe $x $y $x $y $duration")
+        val result = PrivilegeExecutor.exec("input swipe $x $y $x $y $duration")
         return JSONObject().apply {
             put("success", result.isSuccess)
             put("stdout", result.stdout)
@@ -42,7 +42,7 @@ class InputApi {
             throw IllegalArgumentException("x1, y1, x2, y2 required")
         }
 
-        val result = ShizukuHelper.exec("input swipe $x1 $y1 $x2 $y2 $duration")
+        val result = PrivilegeExecutor.exec("input swipe $x1 $y1 $x2 $y2 $duration")
         return JSONObject().apply {
             put("success", result.isSuccess)
             put("stdout", result.stdout)
@@ -76,7 +76,7 @@ class InputApi {
             }
         }
 
-        val result = ShizukuHelper.exec(cmds)
+        val result = PrivilegeExecutor.exec(cmds)
         return JSONObject().apply {
             put("success", result.isSuccess)
             put("stdout", result.stdout)
@@ -89,7 +89,7 @@ class InputApi {
         if (keycode < 0) {
             val key = params.optString("key", "")
             if (key.isNotEmpty()) {
-                val result = ShizukuHelper.exec("input keyevent $key")
+                val result = PrivilegeExecutor.exec("input keyevent $key")
                 return JSONObject().apply {
                     put("success", result.isSuccess)
                     put("stdout", result.stdout)
@@ -101,7 +101,7 @@ class InputApi {
 
         val longpress = params.optBoolean("longpress", false)
         val cmd = if (longpress) "input keyevent --longpress $keycode" else "input keyevent $keycode"
-        val result = ShizukuHelper.exec(cmd)
+        val result = PrivilegeExecutor.exec(cmd)
         return JSONObject().apply {
             put("success", result.isSuccess)
             put("stdout", result.stdout)
@@ -120,9 +120,9 @@ class InputApi {
         val tmpPath = "/data/local/tmp/mcp_input_${System.currentTimeMillis()}.txt"
 
         // Decode base64 to temp file, then pipe to input text (ID 2 = stderr redirected)
-        ShizukuHelper.exec("echo $b64 | base64 -d > $tmpPath 2>/dev/null")
-        val result = ShizukuHelper.exec("cat $tmpPath | input text")
-        ShizukuHelper.exec("rm -f $tmpPath")
+        PrivilegeExecutor.exec("echo $b64 | base64 -d > $tmpPath 2>/dev/null")
+        val result = PrivilegeExecutor.exec("cat $tmpPath | input text")
+        PrivilegeExecutor.exec("rm -f $tmpPath")
 
         return JSONObject().apply {
             put("success", result.isSuccess)

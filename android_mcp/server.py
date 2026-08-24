@@ -18,11 +18,11 @@ from mcp.server.fastmcp import FastMCP
 mcp = FastMCP(
     name="Android MCP Server",
     instructions=(
-        "MCP Server for Android device automation via Shizuku + ADB tunnel. "
+        "MCP Server for Android device automation via Root or Shizuku + ADB tunnel. "
         "Provides system-level control over Android devices including: shell commands, "
         "UI input injection, app management (install/uninstall/clear), file system access, "
         "system settings read/write, clipboard, notifications, and more. "
-        "All through Shizuku's elevated permissions (UID 2000)."
+        "Commands run with root (uid 0 via su) or Shizuku (UID 2000) privileges."
     ),
 )
 

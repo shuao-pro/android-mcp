@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/python-3.10+-blue" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
   <img src="https://img.shields.io/badge/MCP-1.8+-purple" alt="MCP">
-  <img src="https://img.shields.io/badge/version-2.0.2-orange" alt="v2.0.2">
+  <img src="https://img.shields.io/badge/version-2.1.0-orange" alt="v2.1.0">
 </p>
 
 ---
@@ -34,26 +34,32 @@ flowchart LR
 
     subgraph SERVER["🐍 Python 服务器 · android_mcp/"]
         direction TB
-        S1["FastMCP<br/>29 个工具 · :9000<br/>/sse + /mcp"]
+        S1["FastMCP<br/>31 个工具 · :9000<br/>/sse + /mcp"]
         S2["Web GUI · FastAPI<br/>:8080 · WebSocket"]
         S3["tools/<br/>薄封装层"]
         S4["bridge/<br/>JSON-RPC 传输层"]
         S5["vision/<br/>AI 元素定位"]
+        S6["safety/<br/>风险分级 · 用户确认"]
         S1 --- S3
         S3 --- S4
+        S3 --- S6
         S2 --- S4
         S2 --- S5
     end
 
-    subgraph PHONE["📱 Android 应用 · Kotlin + Shizuku"]
+    subgraph PHONE["📱 Android 应用 · Kotlin · Root / Shizuku"]
         direction TB
         P1["HttpServer<br/>:18080"]
         P2["Router<br/>JSON-RPC 分发"]
         P3["api/<br/>shell · input · file · system"]
-        P4["Shizuku<br/>UID 2000"]
+        P4["PrivilegeExecutor<br/>AUTO / ROOT / SHIZUKU"]
+        P5["Root (su)<br/>UID 0"]
+        P6["Shizuku<br/>UID 2000"]
         P1 --- P2
         P2 --- P3
         P3 --- P4
+        P4 --- P5
+        P4 --- P6
     end
 
     C1 --> S1
@@ -70,15 +76,16 @@ flowchart LR
 |------|------|------|----------|
 | **客户端** | Claude Desktop / Kai 9000 / Cherry Studio | 通过 MCP 发送工具调用 | stdio、SSE、Streamable HTTP |
 | | Web 控制台 | 浏览器面板、实时画面、AI 对话 | FastAPI + WebSocket |
-| **Python 服务器** | `server.py`（FastMCP） | 注册 29 个工具，处理 MCP 协议 | FastMCP |
+| **Python 服务器** | `server.py`（FastMCP） | 注册 31 个工具，处理 MCP 协议 | FastMCP |
 | | `bridge/` | 发送 JSON-RPC 到设备，自动 ADB 转发 | httpx、JSON-RPC 2.0 |
 | | `tools/` | 对 `bridge/` 的 `@bridge_call` 薄封装 | 装饰器 |
+| | `safety/` | 风险分级 + 用户确认门控 | MCP elicitation、SAFETY_MODE |
 | | `web/` | 控制台 API、聊天、scrcpy 推流 | FastAPI、uvicorn |
 | | `vision/` | AI 屏幕元素识别 | Claude Vision / GPT-4o |
 | **Android 应用** | `HttpServer` | 内嵌 HTTP 服务器 :18080，token 鉴权 | Java `ServerSocket` |
 | | `Router` | JSON-RPC 方法分发 | JSON-RPC 2.0 |
-| | `api/*` | Shell、触控、应用、文件、系统操作 | Shizuku API |
-| | `util/` | Shizuku binder 封装 + token 存储 | `ShizukuHelper`、`TokenStore` |
+| | `api/*` | Shell、触控、应用、文件、系统操作 | PrivilegeExecutor（Root / Shizuku） |
+| | `util/` | 特权执行器 + token 存储 | `PrivilegeExecutor`、`RootHelper`、`ShizukuHelper`、`TokenStore` |
 
 ### 请求生命周期
 
@@ -86,10 +93,11 @@ flowchart LR
 
 1. **客户端** 通过 MCP（`:9000`）或 Web 控制台（`:8080`）发送 `click(x, y)`。
 2. **FastMCP / FastAPI** 将其路由到 `tools/` 中对应的封装函数。
-3. **`bridge/_core.py`** 序列化为 JSON-RPC 2.0 请求，附带 `X-MCP-Token` 头，POST 到 `http://127.0.0.1:18080/mcp`（必要时自动重建 ADB 转发）。
-4. **`HttpServer`** 校验 token 后，交给 `Router`。
-5. **`Router`** 分发到对应的 `api/*` 模块（如 `InputApi.tap`），通过 **Shizuku**（UID 2000）执行 —— 无需 root。
-6. JSON-RPC 结果沿原链路返回给调用方。
+3. **`safety/`** 对操作进行风险分级；高危命令（破坏性 shell、写入受保护路径、卸载/清除应用等）会通过 MCP elicitation 触发用户交互式确认，同意后才继续。
+4. **`bridge/_core.py`** 序列化为 JSON-RPC 2.0 请求，附带 `X-MCP-Token` 头，POST 到 `http://127.0.0.1:18080/mcp`（必要时自动重建 ADB 转发）。
+5. **`HttpServer`** 校验 token 后，交给 `Router`。
+6. **`Router`** 分发到对应的 `api/*` 模块（如 `InputApi.tap`），通过 **Shizuku**（UID 2000）或 **Root**（su，UID 0）执行 —— 无需 root 即可使用，root 设备可获得完整 root 权限。
+7. JSON-RPC 结果沿原链路返回给调用方。
 
 ### 端口与传输
 
@@ -106,7 +114,7 @@ flowchart LR
 > 💡 服务器可直接在手机上运行（Termux / Kai 9000）。设置 `ANDROID_HOST=127.0.0.1` — 无需 ADB。
 ## 功能特性
 
-### 设备控制（29 个 MCP 工具）
+### 设备控制（31 个 MCP 工具）
 
 | 分类 | 工具 |
 |------|------|
@@ -117,7 +125,30 @@ flowchart LR
 | **屏幕** | `take_screenshot`、`get_ui_hierarchy` |
 | **文件** | `read_file`、`write_file`（支持 `/data/data` 受限目录） |
 | **系统** | `get_system_setting`、`put_system_setting`、`set_clipboard`、`get_clipboard`、`get_notifications`、`start_activity` |
+| **特权模式** | `get_privilege_mode`、`set_privilege_mode` — 切换设备执行后端（auto / shizuku / root） |
 | **AI 视觉** | `find_element` — AI 定位屏幕元素，`click_element` — 识别+点击一步完成 |
+
+### 🛡️ 权限审查（安全防护）
+
+高危设备操作会被门控，需用户确认后才执行：
+
+- 破坏性 shell 命令（`rm -rf`、`dd`、`mkfs`、`mount`、`reboot`、`su`、`pm uninstall/clear` …）
+- 写入受保护路径（`/system`、`/data`、`/vendor` …）
+- 应用安装 / 卸载 / 清除数据、系统设置修改
+
+`SAFETY_MODE` 控制策略：`confirm`（默认）通过 MCP elicitation 向用户弹窗确认；`permissive` 全部放行；`strict` 直接拦截高/中危操作。
+
+### 🔓 特权模式（Root / Shizuku）
+
+Android 应用通过统一的 **PrivilegeExecutor** 执行命令，支持三种模式：
+
+| 模式 | 后端 | 适用 |
+|------|------|------|
+| `root` | `su`（uid 0） | 已 root 设备（Magisk / KernelSU / APatch / SuperSU） |
+| `shizuku` | Shizuku binder（uid 2000） | 未 root 但已安装 Shizuku 的设备 |
+| `auto`（默认） | root → shizuku 回退 | 有 root 用 root，否则用 Shizuku |
+
+可在 Android App 界面、Web 控制台，或通过 `set_privilege_mode` MCP 工具切换。
 
 ### AI 视觉
 
@@ -132,6 +163,7 @@ flowchart LR
 - **scrcpy 投屏** — 一键启动原生低延迟投屏窗口
 - **连接向导** — 5 步引导式配置，自动检测前置条件 + 显示 MCP SSE 地址
 - **设置面板** — 可视化配置 API 供应商 + ADB 设备管理，自动同步 .env
+- **特权模式** — 在侧边栏切换 自动 / Shizuku / Root
 - **中/English** — 完整国际化支持
 - **Shell 终端** — 浏览器内实时 ADB Shell
 
@@ -176,7 +208,7 @@ flowchart LR
 ### 前置条件
 
 - Python 3.10+
-- Android 设备已安装 **Shizuku**
+- Android 设备已安装 **Shizuku**（或已 root 的设备，二选一）
 - ADB（Android SDK Platform Tools）
 - scrcpy（可选，用于原生投屏）
 
@@ -212,8 +244,8 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 
 ### 3. 手机端操作
 
-1. 启动 **Shizuku**（授予 root 或无线调试权限）
-2. 打开 **Android MCP** 应用 → 授予 Shizuku 权限 → 点击 **启动**
+1. 启动 **Shizuku**（授予 root 或无线调试权限）；或使用已 root 的设备
+2. 打开 **Android MCP** 应用 → 选择模式（自动 / Shizuku / Root）→ 授予权限 → 点击 **启动**
 3. 通知栏显示"MCP 服务运行中"（端口 18080）
 4. 复制界面显示的 **鉴权 Token**，填入 `.env` 的 `ANDROID_TOKEN=`
 

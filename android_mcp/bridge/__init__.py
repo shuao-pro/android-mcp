@@ -1,4 +1,4 @@
-﻿"""Android MCP Bridge — JSON-RPC transport to Android device via Shizuku + ADB.
+"""Android MCP Bridge — JSON-RPC transport to Android device via Shizuku + ADB.
 
 Split into domain modules for maintainability. Import from android_mcp.bridge
 directly to access all bridge functions.
@@ -52,10 +52,12 @@ from android_mcp.bridge.system import (
     cancel_notification,
     get_battery_info,
     get_clipboard,
+    get_mode,
     get_notifications,
     get_system_setting,
     put_system_setting,
     set_clipboard,
+    set_mode,
     start_activity,
 )
 
@@ -103,4 +105,6 @@ __all__ = [
     "get_notifications",
     "cancel_notification",
     "start_activity",
+    "get_mode",
+    "set_mode",
 ]

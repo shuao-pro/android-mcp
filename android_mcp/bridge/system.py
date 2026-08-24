@@ -1,4 +1,4 @@
-﻿"""Bridge: system-level operations (settings, clipboard, notifications, intents)."""
+"""Bridge: system-level operations (settings, clipboard, notifications, intents)."""
 
 from typing import Any
 
@@ -53,3 +53,12 @@ async def start_activity(
         for k, v in extra.items():
             cmd_parts.extend(["--es", k, v])
     return await shell(" ".join(escape_shell_arg(p) for p in cmd_parts))
+
+async def get_mode() -> dict[str, Any]:
+    """Get the active privilege mode/backend on the device (auto|shizuku|root)."""
+    return await _send("system.mode.get")
+
+
+async def set_mode(mode: str) -> dict[str, Any]:
+    """Set the privilege mode on the device (auto|shizuku|root)."""
+    return await _send("system.mode.set", {"mode": mode})

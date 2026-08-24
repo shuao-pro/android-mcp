@@ -14,7 +14,7 @@ Control an Android phone with natural language — through Claude Desktop, Cherr
   <img src="https://img.shields.io/badge/python-3.10+-blue" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
   <img src="https://img.shields.io/badge/MCP-1.8+-purple" alt="MCP">
-  <img src="https://img.shields.io/badge/version-2.0.2-orange" alt="v2.0.2">
+  <img src="https://img.shields.io/badge/version-2.1.0-orange" alt="v2.1.0">
 </p>
 
 ---
@@ -35,26 +35,32 @@ flowchart LR
 
     subgraph SERVER["🐍 Python Server · android_mcp/"]
         direction TB
-        S1["FastMCP<br/>29 tools · :9000<br/>/sse + /mcp"]
+        S1["FastMCP<br/>31 tools · :9000<br/>/sse + /mcp"]
         S2["Web GUI · FastAPI<br/>:8080 · WebSocket"]
         S3["tools/<br/>thin wrappers"]
         S4["bridge/<br/>JSON-RPC transport"]
         S5["vision/<br/>AI element locator"]
+        S6["safety/<br/>risk gate · user confirm"]
         S1 --- S3
         S3 --- S4
+        S3 --- S6
         S2 --- S4
         S2 --- S5
     end
 
-    subgraph PHONE["📱 Android App · Kotlin + Shizuku"]
+    subgraph PHONE["📱 Android App · Kotlin · Root / Shizuku"]
         direction TB
         P1["HttpServer<br/>:18080"]
         P2["Router<br/>JSON-RPC dispatch"]
         P3["api/<br/>shell · input · file · system"]
-        P4["Shizuku<br/>UID 2000"]
+        P4["PrivilegeExecutor<br/>AUTO / ROOT / SHIZUKU"]
+        P5["Root (su)<br/>UID 0"]
+        P6["Shizuku<br/>UID 2000"]
         P1 --- P2
         P2 --- P3
         P3 --- P4
+        P4 --- P5
+        P4 --- P6
     end
 
     C1 --> S1
@@ -71,15 +77,16 @@ flowchart LR
 |-------|-----------|----------------|----------|
 | **Clients** | Claude Desktop / Kai 9000 / Cherry Studio | Send tool calls as MCP messages | stdio, SSE, Streamable HTTP |
 | | Web Dashboard | Browser panel, live screen, AI chat | FastAPI + WebSocket |
-| **Python server** | `server.py` (FastMCP) | Registers 29 tools, speaks MCP | FastMCP |
+| **Python server** | `server.py` (FastMCP) | Registers 31 tools, speaks MCP | FastMCP |
 | | `bridge/` | JSON-RPC → device, auto ADB forward | httpx, JSON-RPC 2.0 |
 | | `tools/` | Thin `@bridge_call` wrappers | decorators |
+| | `safety/` | Risk classification + user confirmation gate | MCP elicitation, SAFETY_MODE |
 | | `web/` | Dashboard API, chat, scrcpy stream | FastAPI, uvicorn |
 | | `vision/` | AI screen-element recognition | Claude Vision / GPT-4o |
 | **Android app** | `HttpServer` | Embedded HTTP server :18080, token auth | Java `ServerSocket` |
 | | `Router` | JSON-RPC method dispatch | JSON-RPC 2.0 |
-| | `api/*` | Shell, input, package, file, system | Shizuku API |
-| | `util/` | Shizuku binder wrapper + token store | `ShizukuHelper`, `TokenStore` |
+| | `api/*` | Shell, input, package, file, system | PrivilegeExecutor (Root / Shizuku) |
+| | `util/` | Privilege executor + token store | `PrivilegeExecutor`, `RootHelper`, `ShizukuHelper`, `TokenStore` |
 
 ### Request lifecycle
 
@@ -87,10 +94,11 @@ Every tool call follows one path — e.g. `click(x, y)`:
 
 1. **Client** sends `click(x, y)` over MCP (`:9000`) or the Web Dashboard (`:8080`).
 2. **FastMCP / FastAPI** routes it to the matching `tools/` wrapper.
-3. **`bridge/_core.py`** serializes it as a JSON-RPC 2.0 request, attaches the `X-MCP-Token` header, and POSTs to `http://127.0.0.1:18080/mcp` (re-establishing the ADB forward if needed).
-4. **`HttpServer`** authenticates the token, then hands the request to `Router`.
-5. **`Router`** dispatches to the right `api/*` module (e.g. `InputApi.tap`), which runs it via **Shizuku** (UID 2000) — no root required.
-6. The JSON-RPC result travels back up the same chain.
+3. **`safety/`** classifies the operation; high-risk commands (destructive shell, writes to protected paths, app uninstall/clear) trigger an interactive user confirmation via MCP elicitation before continuing.
+4. **`bridge/_core.py`** serializes it as a JSON-RPC 2.0 request, attaches the `X-MCP-Token` header, and POSTs to `http://127.0.0.1:18080/mcp` (re-establishing the ADB forward if needed).
+5. **`HttpServer`** authenticates the token, then hands the request to `Router`.
+6. **`Router`** dispatches to the right `api/*` module (e.g. `InputApi.tap`), which runs it via **Shizuku** (UID 2000) or **Root** (su, UID 0) — no root required, but rooted devices get full root access.
+7. The JSON-RPC result travels back up the same chain.
 
 ### Ports & transports
 
@@ -105,7 +113,7 @@ Every tool call follows one path — e.g. `click(x, y)`:
 > 💡 The server can run on the phone itself (Termux / Kai 9000). Set `ANDROID_HOST=127.0.0.1` — no ADB needed.
 ## ✨ Features
 
-### Device Control (29 MCP Tools)
+### Device Control (31 MCP Tools)
 
 | Category | Tools |
 |----------|-------|
@@ -116,7 +124,30 @@ Every tool call follows one path — e.g. `click(x, y)`:
 | **Screen** | `take_screenshot`, `get_ui_hierarchy` |
 | **Files** | `read_file`, `write_file` (including `/data/data`) |
 | **System** | `get_system_setting`, `put_system_setting`, `set_clipboard`, `get_clipboard`, `get_notifications`, `start_activity` |
+| **Privilege** | `get_privilege_mode`, `set_privilege_mode` — switch device execution backend (auto / shizuku / root) |
 | **Vision** | `find_element` — AI locates UI elements, `click_element` — find + click in one step |
+
+### 🛡️ Safety Guard
+
+High-risk device operations are gated behind user confirmation:
+
+- Destructive shell commands (`rm -rf`, `dd`, `mkfs`, `mount`, `reboot`, `su`, `pm uninstall/clear`, …)
+- Writes to protected paths (`/system`, `/data`, `/vendor`, …)
+- App install / uninstall / data clear, and system settings mutation
+
+`SAFETY_MODE` controls the policy: `confirm` (default) prompts the user via MCP elicitation, `permissive` allows everything, and `strict` blocks risky operations outright.
+
+### 🔓 Privilege Mode (Root / Shizuku)
+
+The Android app executes commands through a unified **PrivilegeExecutor** that supports three modes:
+
+| Mode | Backend | Use |
+|------|---------|-----|
+| `root` | `su` (uid 0) | Rooted devices (Magisk / KernelSU / APatch / SuperSU) |
+| `shizuku` | Shizuku binder (uid 2000) | Non-root devices with Shizuku installed |
+| `auto` (default) | root → shizuku fallback | Use root when available, otherwise Shizuku |
+
+Selectable from the Android app UI, the Web Dashboard, or the `set_privilege_mode` MCP tool.
 
 ### AI Vision
 
@@ -131,6 +162,7 @@ Every tool call follows one path — e.g. `click(x, y)`:
 - **scrcpy** — native low-latency mirroring (one-click launch)
 - **Setup Wizard** — guided 5-step setup with auto-detection + MCP SSE endpoint display
 - **Settings Panel** — configure API providers + ADB device manager with .env sync
+- **Privilege Mode** — switch Auto / Shizuku / Root from the sidebar
 - **中/English** — full i18n support
 - **Shell Terminal** — live ADB shell in the browser
 
@@ -171,7 +203,7 @@ Connect any MCP-compatible client to the server:
 ### Prerequisites
 
 - Python 3.10+
-- Android device with **Shizuku** installed
+- Android device with **Shizuku** installed (or a rooted device — either works)
 - ADB (Android SDK Platform Tools)
 - scrcpy (optional, for native mirroring)
 
@@ -207,8 +239,8 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 
 ### 3. On Your Phone
 
-1. Start **Shizuku** (grant root or wireless debugging permission)
-2. Open **Android MCP** app → grant Shizuku permission → tap **Start**
+1. Start **Shizuku** (grant root or wireless debugging permission), or use a rooted device
+2. Open **Android MCP** app → pick a mode (Auto / Shizuku / Root) → grant permission → tap **Start**
 3. Notification shows "MCP service running" on port 18080
 4. Copy the **auth token** shown in the app into `.env` → `ANDROID_TOKEN=`
 
@@ -262,6 +294,9 @@ ANDROID_PORT=18080
 
 # Android bridge auth token (shown in the app UI — copy it here)
 ANDROID_TOKEN=
+
+# Safety guard — gate high-risk device operations (default: confirm)
+SAFETY_MODE=confirm           # permissive | confirm | strict
 
 # Web GUI
 WEB_HOST=127.0.0.1

@@ -21,7 +21,7 @@ from android_mcp.web.scrcpy_bridge import (
     remove_stream_client,
 )
 
-app = FastAPI(title="Android MCP Dashboard", version="2.0")
+app = FastAPI(title="Android MCP Dashboard", version="2.1")
 
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 
@@ -43,6 +43,18 @@ async def api_status():
 @app.get("/api/history")
 async def api_history():
     return bridge.get_history()
+
+
+@app.get("/api/mode")
+async def api_get_mode():
+    return await bridge.get_mode()
+
+
+@app.post("/api/mode")
+async def api_set_mode(data: dict):
+    body = data or {}
+    mode = (body.get("mode") or "auto").strip().lower()
+    return await bridge.set_mode(mode)
 
 
 @app.get("/api/setup/status")
@@ -554,6 +566,10 @@ async def ws_endpoint(ws: WebSocket):
                     result = await bridge.close_app(**params)
                 elif cmd == "battery":
                     result = await bridge.get_battery_info()
+                elif cmd == "get_mode":
+                    result = await bridge.get_mode()
+                elif cmd == "set_mode":
+                    result = await bridge.set_mode(params.get("mode", "auto"))
                 elif cmd == "history":
                     result = {"history": bridge.get_history()}
             except Exception as e:

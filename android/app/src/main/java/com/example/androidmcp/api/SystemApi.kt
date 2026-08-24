@@ -8,6 +8,8 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Base64
 import com.example.androidmcp.App
+import com.example.androidmcp.util.PrivilegeExecutor
+import com.example.androidmcp.util.RootHelper
 import com.example.androidmcp.util.ShizukuHelper
 import org.json.JSONArray
 import org.json.JSONObject
@@ -23,10 +25,10 @@ class SystemApi {
         val model = Build.MODEL
         val brand = Build.BRAND
 
-        val screenRes = ShizukuHelper.exec("wm size")
-        val density = ShizukuHelper.exec("wm density")
-        val battery = ShizukuHelper.exec("dumpsys battery | grep level")
-        val uptime = ShizukuHelper.exec("cat /proc/uptime")
+        val screenRes = PrivilegeExecutor.exec("wm size")
+        val density = PrivilegeExecutor.exec("wm density")
+        val battery = PrivilegeExecutor.exec("dumpsys battery | grep level")
+        val uptime = PrivilegeExecutor.exec("cat /proc/uptime")
 
         return JSONObject().apply {
             put("os_version", osBuild)
@@ -47,7 +49,7 @@ class SystemApi {
         if (quality !in 1..100) throw IllegalArgumentException("quality must be 1-100")
 
         val tmpPath = "/data/local/tmp/mcp_screenshot_${System.currentTimeMillis()}.png"
-        val result = ShizukuHelper.exec("screencap -p $tmpPath")
+        val result = PrivilegeExecutor.exec("screencap -p $tmpPath")
 
         if (!result.isSuccess) {
             return JSONObject().apply {
@@ -56,8 +58,8 @@ class SystemApi {
             }
         }
 
-        val catResult = ShizukuHelper.exec("cat $tmpPath | base64 -w 0")
-        ShizukuHelper.exec("rm -f $tmpPath")
+        val catResult = PrivilegeExecutor.exec("cat $tmpPath | base64 -w 0")
+        PrivilegeExecutor.exec("rm -f $tmpPath")
 
         if (!catResult.isSuccess) {
             return JSONObject().apply {
@@ -78,7 +80,7 @@ class SystemApi {
         val key = params.optString("key", "")
         if (key.isEmpty()) throw IllegalArgumentException("key required")
 
-        val result = ShizukuHelper.exec("settings get $namespace $key")
+        val result = PrivilegeExecutor.exec("settings get $namespace $key")
         return JSONObject().apply {
             put("success", result.isSuccess)
             put("key", key)
@@ -93,7 +95,7 @@ class SystemApi {
         val value = params.optString("value", "")
         if (key.isEmpty()) throw IllegalArgumentException("key required")
 
-        val result = ShizukuHelper.exec("settings put $namespace $key $value")
+        val result = PrivilegeExecutor.exec("settings put $namespace $key $value")
         return JSONObject().apply {
             put("success", result.isSuccess)
             put("stdout", result.stdout)
@@ -148,7 +150,7 @@ class SystemApi {
     }
 
     fun listNotifications(): JSONObject {
-        val result = ShizukuHelper.exec("dumpsys notification --noredact 2>/dev/null | grep 'NotificationRecord' || dumpsys notification 2>/dev/null | grep 'NotificationRecord'")
+        val result = PrivilegeExecutor.exec("dumpsys notification --noredact 2>/dev/null | grep 'NotificationRecord' || dumpsys notification 2>/dev/null | grep 'NotificationRecord'")
 
         val notifications = JSONArray()
         result.stdout.lines().forEach { line ->
@@ -178,7 +180,7 @@ class SystemApi {
         val pkg = params.optString("package", "")
         if (pkg.isEmpty()) throw IllegalArgumentException("package required")
 
-        val result = ShizukuHelper.exec("service call notification 5 s16 '$pkg' 2>/dev/null || service call notification 4 s16 '$pkg' 2>/dev/null")
+        val result = PrivilegeExecutor.exec("service call notification 5 s16 '$pkg' 2>/dev/null || service call notification 4 s16 '$pkg' 2>/dev/null")
         return JSONObject().apply {
             put("success", true)
             put("stdout", result.stdout)
@@ -187,7 +189,7 @@ class SystemApi {
     }
 
     fun reboot(): JSONObject {
-        val result = ShizukuHelper.exec("reboot")
+        val result = PrivilegeExecutor.exec("reboot")
         return JSONObject().apply {
             put("success", true)
             put("message", "Rebooting device")
@@ -195,7 +197,7 @@ class SystemApi {
     }
 
     fun screenOn(): JSONObject {
-        val checkResult = ShizukuHelper.exec("dumpsys power | grep 'mWakefulness'")
+        val checkResult = PrivilegeExecutor.exec("dumpsys power | grep 'mWakefulness'")
         val isAwake = checkResult.stdout.contains("Awake")
         if (isAwake) {
             return JSONObject().apply {
@@ -203,7 +205,7 @@ class SystemApi {
                 put("message", "Screen already on")
             }
         }
-        val result = ShizukuHelper.exec("input keyevent 224")
+        val result = PrivilegeExecutor.exec("input keyevent 224")
         return JSONObject().apply {
             put("success", result.isSuccess)
             if (!result.isSuccess) {
@@ -213,7 +215,7 @@ class SystemApi {
     }
 
     fun screenOff(): JSONObject {
-        val checkResult = ShizukuHelper.exec("dumpsys power | grep 'mWakefulness'")
+        val checkResult = PrivilegeExecutor.exec("dumpsys power | grep 'mWakefulness'")
         val isAwake = checkResult.stdout.contains("Awake")
         if (!isAwake) {
             return JSONObject().apply {
@@ -221,12 +223,41 @@ class SystemApi {
                 put("message", "Screen already off")
             }
         }
-        val result = ShizukuHelper.exec("input keyevent 26")
+        val result = PrivilegeExecutor.exec("input keyevent 26")
         return JSONObject().apply {
             put("success", result.isSuccess)
             if (!result.isSuccess) {
                 put("error", result.stderr)
             }
+        }
+    }
+
+
+    fun getMode(): JSONObject {
+        return JSONObject().apply {
+            put("success", true)
+            put("mode", PrivilegeExecutor.getMode().name.lowercase())
+            put("backend", PrivilegeExecutor.activeBackendName())
+            put("root", RootHelper.isReady())
+            put("shizuku", ShizukuHelper.isReady())
+        }
+    }
+
+    fun setMode(params: JSONObject): JSONObject {
+        val modeStr = params.optString("mode", "auto").trim().uppercase()
+        val mode = try {
+            PrivilegeExecutor.Mode.valueOf(modeStr)
+        } catch (e: Exception) {
+            throw IllegalArgumentException("Invalid mode '$modeStr' (use auto|shizuku|root)")
+        }
+        PrivilegeExecutor.setMode(App.instance, mode)
+        PrivilegeExecutor.checkStatus()
+        return JSONObject().apply {
+            put("success", true)
+            put("mode", PrivilegeExecutor.getMode().name.lowercase())
+            put("backend", PrivilegeExecutor.activeBackendName())
+            put("root", RootHelper.isReady())
+            put("shizuku", ShizukuHelper.isReady())
         }
     }
 }

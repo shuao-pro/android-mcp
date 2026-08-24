@@ -1,6 +1,7 @@
 package com.example.androidmcp.server
 
 import android.util.Log
+import com.example.androidmcp.util.PrivilegeExecutor
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -162,7 +163,10 @@ class HttpServer(
                     JSONObject().apply {
                         put("result", "ok")
                         put("connected", true)
-                        put("shizuku_running", true)
+                        put("shizuku_running", PrivilegeExecutor.shizukuReady())
+                        put("root", PrivilegeExecutor.rootReady())
+                        put("backend", PrivilegeExecutor.activeBackendName())
+                        put("mode", PrivilegeExecutor.getMode().name.lowercase())
                     }
                 } else {
                     JSONObject().apply {

@@ -24,7 +24,7 @@
         android:id="@+id/tvSubtitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="基于 Shizuku 的设备远程控制"
+        android:text="基于 Root / Shizuku 的设备远程控制"
         android:textColor="#888888"
         android:textSize="14sp"
         app:layout_constraintStart_toStartOf="parent"
@@ -66,7 +66,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/shell_status"
+                    android:text="@string/privilege_status"
                     android:textColor="#888888"
                     android:textSize="11sp"
                     android:layout_marginTop="4dp" />
@@ -156,6 +156,50 @@
         app:layout_constraintTop_toBottomOf="@id/layoutStatusCards"
         android:layout_marginTop="6dp" />
 
+    <LinearLayout
+        android:id="@+id/layoutModeSelector"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        app:layout_constraintTop_toBottomOf="@id/tvShellDetail"
+        android:layout_marginTop="12dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnModeAuto"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:text="@string/mode_auto"
+            android:textSize="13sp"
+            android:textColor="#FFFFFF"
+            app:backgroundTint="#424242"
+            app:cornerRadius="8dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnModeShizuku"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:text="@string/mode_shizuku"
+            android:textSize="13sp"
+            android:textColor="#FFFFFF"
+            app:backgroundTint="#424242"
+            app:cornerRadius="8dp"
+            android:layout_marginStart="8dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnModeRoot"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:text="@string/mode_root"
+            android:textSize="13sp"
+            android:textColor="#FFFFFF"
+            app:backgroundTint="#424242"
+            app:cornerRadius="8dp"
+            android:layout_marginStart="8dp" />
+    </LinearLayout>
+
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnToggle"
         android:layout_width="match_parent"
@@ -165,8 +209,8 @@
         android:textStyle="bold"
         android:textColor="#FFFFFF"
         app:backgroundTint="#1565C0"
-        app:layout_constraintTop_toBottomOf="@id/layoutStatusCards"
-        android:layout_marginTop="32dp" />
+        app:layout_constraintTop_toBottomOf="@id/layoutModeSelector"
+        android:layout_marginTop="16dp" />
 
     <androidx.cardview.widget.CardView
         android:id="@+id/cardToken"

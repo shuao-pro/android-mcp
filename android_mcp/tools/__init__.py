@@ -8,6 +8,9 @@ Usage:
 
 from typing import Dict, Any
 
+from mcp.server.fastmcp import Context
+
+from android_mcp import safety
 from android_mcp.tools.device import (
     tool_health_check,
     tool_get_device_info,
@@ -40,6 +43,8 @@ from android_mcp.tools.system import (
     tool_get_clipboard,
     tool_get_notifications,
     tool_start_activity,
+    tool_get_privilege_mode,
+    tool_set_privilege_mode,
 )
 from android_mcp.tools.files import (
     tool_read_file,
@@ -80,6 +85,8 @@ __all__ = [
     "tool_get_clipboard",
     "tool_get_notifications",
     "tool_start_activity",
+    "tool_get_privilege_mode",
+    "tool_set_privilege_mode",
     # files
     "tool_read_file",
     "tool_write_file",
@@ -169,18 +176,27 @@ def register_all_tools(mcp) -> None:
         return await tool_close_app(package_name)
 
     @mcp.tool()
-    async def clear_app_data(package_name: str) -> Dict[str, Any]:
+    async def clear_app_data(package_name: str, ctx: Context = None) -> Dict[str, Any]:
         """Clear all data for an app via pm clear."""
+        allowed, err = await safety.gate(ctx, safety.Risk.HIGH, f"clear app data: {package_name}")
+        if not allowed:
+            return {"success": False, "error": err, "blocked": True}
         return await tool_clear_app_data(package_name)
 
     @mcp.tool()
-    async def install_app(apk_path: str, silent: bool = True) -> Dict[str, Any]:
+    async def install_app(apk_path: str, silent: bool = True, ctx: Context = None) -> Dict[str, Any]:
         """Install an APK (supports silent install via Shizuku)."""
+        allowed, err = await safety.gate(ctx, safety.Risk.HIGH, f"install APK: {apk_path}")
+        if not allowed:
+            return {"success": False, "error": err, "blocked": True}
         return await tool_install_app(apk_path, silent)
 
     @mcp.tool()
-    async def uninstall_app(package_name: str) -> Dict[str, Any]:
+    async def uninstall_app(package_name: str, ctx: Context = None) -> Dict[str, Any]:
         """Uninstall an app by its package name."""
+        allowed, err = await safety.gate(ctx, safety.Risk.HIGH, f"uninstall app: {package_name}")
+        if not allowed:
+            return {"success": False, "error": err, "blocked": True}
         return await tool_uninstall_app(package_name)
 
     @mcp.tool()
@@ -195,8 +211,12 @@ def register_all_tools(mcp) -> None:
 
     # -- system --
     @mcp.tool()
-    async def shell(command: str, timeout: float = 30.0) -> Dict[str, Any]:
-        """Execute a shell command with ADB/Shizuku privileges."""
+    async def shell(command: str, timeout: float = 30.0, ctx: Context = None) -> Dict[str, Any]:
+        """Execute a shell command with ADB/Shizuku/root privileges. High-risk commands require user approval."""
+        risk = safety.classify_shell(command)
+        allowed, err = await safety.gate(ctx, risk, f"shell command: {command[:200]}")
+        if not allowed:
+            return {"success": False, "error": err, "blocked": True}
         return await tool_shell(command, timeout)
 
     @mcp.tool()
@@ -206,9 +226,13 @@ def register_all_tools(mcp) -> None:
 
     @mcp.tool()
     async def put_system_setting(
-        namespace: str, key: str, value: str
+        namespace: str, key: str, value: str, ctx: Context = None
     ) -> Dict[str, Any]:
         """Write a system setting (requires Shizuku elevated permissions)."""
+        risk = safety.Risk.HIGH if namespace.strip().lower() == "secure" else safety.Risk.MEDIUM
+        allowed, err = await safety.gate(ctx, risk, f"write system setting: {namespace}.{key}")
+        if not allowed:
+            return {"success": False, "error": err, "blocked": True}
         return await tool_put_system_setting(namespace, key, value)
 
     @mcp.tool()
@@ -231,6 +255,16 @@ def register_all_tools(mcp) -> None:
         """Start an Activity via an Android Intent."""
         return await tool_start_activity(action, extra)
 
+    @mcp.tool()
+    async def get_privilege_mode() -> Dict[str, Any]:
+        """Get the active privilege mode/backend on the Android device (auto|shizuku|root)."""
+        return await tool_get_privilege_mode()
+
+    @mcp.tool()
+    async def set_privilege_mode(mode: str) -> Dict[str, Any]:
+        """Set the privilege mode on the Android device: auto, shizuku, or root."""
+        return await tool_set_privilege_mode(mode)
+
     # -- files --
     @mcp.tool()
     async def read_file(path: str) -> Dict[str, Any]:
@@ -238,8 +272,12 @@ def register_all_tools(mcp) -> None:
         return await tool_read_file(path)
 
     @mcp.tool()
-    async def write_file(path: str, content: str) -> Dict[str, Any]:
+    async def write_file(path: str, content: str, ctx: Context = None) -> Dict[str, Any]:
         """Write content to a file on the device (supports /data/data and other restricted directories)."""
+        risk = safety.classify_file_write(path)
+        allowed, err = await safety.gate(ctx, risk, f"write file: {path}")
+        if not allowed:
+            return {"success": False, "error": err, "blocked": True}
         return await tool_write_file(path, content)
 
     # -- vision --

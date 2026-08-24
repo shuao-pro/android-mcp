@@ -144,12 +144,4 @@ object ShizukuHelper {
     fun getStatusSummary(): String {
         return "available=$isAvailable, permission=$isPermissionGranted, verified=$isVerified"
     }
-
-    data class ExecResult(
-        val exitCode: Int,
-        val stdout: String,
-        val stderr: String
-    ) {
-        val isSuccess: Boolean get() = exitCode == 0
-    }
 }

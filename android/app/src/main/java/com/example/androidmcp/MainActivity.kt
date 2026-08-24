@@ -13,8 +13,11 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.example.androidmcp.util.PrivilegeExecutor
+import com.example.androidmcp.util.RootHelper
 import com.example.androidmcp.util.ShizukuHelper
 import com.example.androidmcp.util.TokenStore
+import com.google.android.material.button.MaterialButton
 import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : AppCompatActivity() {
@@ -29,6 +32,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var layoutAuthButtons: View
     private lateinit var tvLog: TextView
     private lateinit var tvToken: TextView
+
+    private lateinit var btnModeAuto: MaterialButton
+    private lateinit var btnModeShizuku: MaterialButton
+    private lateinit var btnModeRoot: MaterialButton
 
     private val logLines = mutableListOf<String>()
     private val isServiceRunning = AtomicBoolean(false)
@@ -48,21 +55,25 @@ class MainActivity : AppCompatActivity() {
         tvLog = findViewById(R.id.tvLog)
         tvToken = findViewById(R.id.tvToken)
 
+        btnModeAuto = findViewById(R.id.btnModeAuto)
+        btnModeShizuku = findViewById(R.id.btnModeShizuku)
+        btnModeRoot = findViewById(R.id.btnModeRoot)
+
         tvToken.text = TokenStore.getOrCreate(this)
         tvToken.setOnClickListener { copyTokenToClipboard() }
 
-        ShizukuHelper.onStatusChanged = {
+        PrivilegeExecutor.onStatusChanged = {
             runOnUiThread { updateUI() }
         }
 
         requestNotificationPermission()
-        checkShizukuStatus()
+        refreshStatus()
 
         btnToggle.setOnClickListener {
             if (isServiceRunning.get()) {
                 stopService()
             } else {
-                if (!ShizukuHelper.isReady()) {
+                if (!PrivilegeExecutor.isReady()) {
                     attemptAuthorize()
                     return@setOnClickListener
                 }
@@ -71,38 +82,62 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnAuth.setOnClickListener { attemptAuthorize() }
-        btnRefresh.setOnClickListener { checkShizukuStatus() }
+        btnRefresh.setOnClickListener { refreshStatus() }
+
+        btnModeAuto.setOnClickListener {
+            PrivilegeExecutor.setMode(this, PrivilegeExecutor.Mode.AUTO)
+            refreshStatus()
+        }
+        btnModeShizuku.setOnClickListener {
+            PrivilegeExecutor.setMode(this, PrivilegeExecutor.Mode.SHIZUKU)
+            refreshStatus()
+        }
+        btnModeRoot.setOnClickListener {
+            PrivilegeExecutor.setMode(this, PrivilegeExecutor.Mode.ROOT)
+            refreshStatus()
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        checkShizukuStatus()
+        refreshStatus()
         isServiceRunning.set(McpService.serviceRunning)
         updateUI()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        ShizukuHelper.onStatusChanged = null
+        PrivilegeExecutor.onStatusChanged = null
     }
 
-    private fun checkShizukuStatus() {
-        val wasReady = ShizukuHelper.isReady()
-        ShizukuHelper.checkStatus()
-        val isNowReady = ShizukuHelper.isReady()
+    private fun refreshStatus() {
+        val wasReady = PrivilegeExecutor.isReady()
+        PrivilegeExecutor.checkStatus()
+        val isNowReady = PrivilegeExecutor.isReady()
 
-        val diag = ShizukuHelper.lastDiagnostic
+        val diag = buildDiagnostic()
         appendLog(if (diag.isNotEmpty()) diag else "检查: ready=$isNowReady")
 
         if (isNowReady && !wasReady) {
-            appendLog("✓ Shizuku 已就绪！")
+            appendLog("✓ ${PrivilegeExecutor.activeBackendName().uppercase()} 已就绪！")
         }
 
         updateUI()
 
-        if (!isNowReady && !ShizukuHelper.isAvailable && retryCount < MAX_RETRY) {
+        if (!isNowReady && retryCount < MAX_RETRY) {
             scheduleRetry()
         }
+    }
+
+    private fun buildDiagnostic(): String {
+        val parts = mutableListOf<String>()
+        if (ShizukuHelper.lastDiagnostic.isNotEmpty()) {
+            parts.add("Shizuku: ${ShizukuHelper.lastDiagnostic}")
+        }
+        if (RootHelper.lastDiagnostic.isNotEmpty()) {
+            parts.add("Root: ${RootHelper.lastDiagnostic}")
+        }
+        return parts.joinToString("\n")
     }
 
     private var retryCount = 0
@@ -116,7 +151,7 @@ class MainActivity : AppCompatActivity() {
         retryHandler = handler
         handler.postDelayed({
             appendLog("重试 #$retryCount...")
-            checkShizukuStatus()
+            refreshStatus()
         }, 800)
     }
 
@@ -124,9 +159,23 @@ class MainActivity : AppCompatActivity() {
         retryCount = 0
         retryHandler?.removeCallbacksAndMessages(null)
 
-        appendLog("正在打开 Shizuku Manager...")
-        appendLog("请在 Shizuku → 已授权应用 → 找到 Android MCP → 开启授权")
-        ShizukuHelper.openShizukuManager(this)
+        val mode = PrivilegeExecutor.getMode()
+        val requestRoot = mode == PrivilegeExecutor.Mode.ROOT ||
+            (mode == PrivilegeExecutor.Mode.AUTO &&
+                RootHelper.isAvailable && !RootHelper.isPermissionGranted)
+
+        if (requestRoot) {
+            appendLog("正在请求 Root 权限...")
+            appendLog("请在 Superuser 管理器（Magisk/KernelSU 等）弹出时点击允许")
+            RootHelper.requestGrant()
+            android.os.Handler(Looper.getMainLooper()).postDelayed({
+                refreshStatus()
+            }, 800)
+        } else {
+            appendLog("正在打开 Shizuku Manager...")
+            appendLog("请在 Shizuku → 已授权应用 → 找到 Android MCP → 开启授权")
+            ShizukuHelper.openShizukuManager(this)
+        }
     }
 
     private fun requestNotificationPermission() {
@@ -177,27 +226,39 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateUI() {
-        val available = ShizukuHelper.isAvailable
-        val granted = ShizukuHelper.isPermissionGranted
-        val verified = ShizukuHelper.isVerified
+        val mode = PrivilegeExecutor.getMode()
+        val ready = PrivilegeExecutor.isReady()
+        val backend = PrivilegeExecutor.activeBackendName()
         val running = isServiceRunning.get()
 
         tvShellStatus.text = when {
-            !available -> "Shizuku 未启动"
-            !granted -> "等待授权"
-            !verified -> "验证中..."
-            else -> "已就绪"
+            ready -> if (backend == "root") "已就绪 · Root" else "已就绪 · Shizuku"
+            mode == PrivilegeExecutor.Mode.ROOT -> when {
+                !RootHelper.isAvailable -> "未检测到 Root"
+                !RootHelper.isPermissionGranted -> "Root 未授权"
+                else -> "Root 验证中"
+            }
+            mode == PrivilegeExecutor.Mode.SHIZUKU -> when {
+                !ShizukuHelper.isAvailable -> "Shizuku 未启动"
+                !ShizukuHelper.isPermissionGranted -> "等待授权"
+                else -> "Shizuku 验证中"
+            }
+            else -> when {
+                RootHelper.isAvailable || ShizukuHelper.isAvailable -> "等待授权"
+                else -> "无可用特权"
+            }
         }
+
         tvShellStatus.setTextColor(
             when {
-                verified -> 0xFF4CAF50.toInt()
-                available -> 0xFFFF9800.toInt()
+                ready -> 0xFF4CAF50.toInt()
+                RootHelper.isAvailable || ShizukuHelper.isAvailable -> 0xFFFF9800.toInt()
                 else -> 0xFFF44336.toInt()
             }
         )
 
-        val diag = ShizukuHelper.lastDiagnostic
-        tvShellDetail.visibility = if (!verified && diag.isNotEmpty()) View.VISIBLE else View.GONE
+        val diag = buildDiagnostic()
+        tvShellDetail.visibility = if (!ready && diag.isNotEmpty()) View.VISIBLE else View.GONE
         tvShellDetail.text = if (diag.isNotEmpty()) diag else ""
 
         if (running) {
@@ -208,7 +269,7 @@ class MainActivity : AppCompatActivity() {
             tvHttpAddress.setTextColor(0xFFFF9800.toInt())
         }
 
-        tvApiCount.text = "29"
+        tvApiCount.text = "31"
         tvApiCount.setTextColor(0xFF42A5F5.toInt())
 
         if (running) {
@@ -221,8 +282,24 @@ class MainActivity : AppCompatActivity() {
                 android.content.res.ColorStateList.valueOf(0xFF1565C0.toInt())
         }
 
-        layoutAuthButtons.visibility = if (!verified) View.VISIBLE else View.GONE
-        btnAuth.text = if (available) "前往授权" else "打开 Shizuku"
+        layoutAuthButtons.visibility = if (!ready) View.VISIBLE else View.GONE
+        btnAuth.text = when {
+            mode == PrivilegeExecutor.Mode.ROOT -> "请求 Root 权限"
+            mode == PrivilegeExecutor.Mode.AUTO &&
+                RootHelper.isAvailable && !RootHelper.isPermissionGranted -> "请求 Root 权限"
+            else -> if (ShizukuHelper.isAvailable) "前往授权" else "打开 Shizuku"
+        }
+
+        updateModeButtons(mode)
+    }
+
+    private fun updateModeButtons(active: PrivilegeExecutor.Mode) {
+        val on = android.content.res.ColorStateList.valueOf(0xFF1565C0.toInt())
+        val off = android.content.res.ColorStateList.valueOf(0xFF424242.toInt())
+
+        btnModeAuto.backgroundTintList = if (active == PrivilegeExecutor.Mode.AUTO) on else off
+        btnModeShizuku.backgroundTintList = if (active == PrivilegeExecutor.Mode.SHIZUKU) on else off
+        btnModeRoot.backgroundTintList = if (active == PrivilegeExecutor.Mode.ROOT) on else off
     }
 
     private fun copyTokenToClipboard() {

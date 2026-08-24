@@ -1,4 +1,4 @@
-﻿"""Tools: system-level operations (shell, settings, clipboard, notifications, intents)."""
+"""Tools: system-level operations (shell, settings, clipboard, notifications, intents)."""
 
 import json
 from typing import Dict, Any
@@ -47,3 +47,17 @@ async def tool_start_activity(action: str, extra: str = "{}") -> Dict[str, Any]:
     """Start Activity via Intent."""
     extra_dict = json.loads(extra) if extra else {}
     return await bridge.start_activity(action, extra_dict)
+
+@bridge_call
+async def tool_get_privilege_mode() -> Dict[str, Any]:
+    """Get the active privilege mode/backend on the Android device (auto|shizuku|root)."""
+    return await bridge.get_mode()
+
+
+@bridge_call
+async def tool_set_privilege_mode(mode: str) -> Dict[str, Any]:
+    """Set the privilege mode on the Android device: auto, shizuku, or root.
+
+    root mode runs shell commands as uid 0 via su (for rooted devices).
+    """
+    return await bridge.set_mode(mode)

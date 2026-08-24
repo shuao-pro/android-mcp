@@ -1,4 +1,4 @@
-﻿"""Bridge: device state queries (health, info, screenshot, shell, hierarchy)."""
+"""Bridge: device state queries (health, info, screenshot, shell, hierarchy)."""
 
 from typing import Any
 
@@ -23,7 +23,13 @@ async def health_check() -> dict[str, Any]:
                 return {"connected": False, "error": "auth failed: ANDROID_TOKEN missing or invalid"}
             data = resp.json()
             if data.get("result") == "ok" or data.get("connected"):
-                return {"connected": True, "shizuku_running": True}
+                return {
+                    "connected": True,
+                    "shizuku_running": bool(data.get("shizuku_running", True)),
+                    "root": bool(data.get("root", False)),
+                    "backend": data.get("backend", "unknown"),
+                    "mode": data.get("mode", "auto"),
+                }
             return {"connected": False, "error": "unexpected health response"}
     except Exception as e:
         return {"connected": False, "error": str(e)}

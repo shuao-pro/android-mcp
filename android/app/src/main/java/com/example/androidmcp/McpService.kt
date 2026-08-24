@@ -12,7 +12,7 @@ import android.os.IBinder
 import android.util.Log
 import com.example.androidmcp.server.HttpServer
 import com.example.androidmcp.server.Router
-import com.example.androidmcp.util.ShizukuHelper
+import com.example.androidmcp.util.PrivilegeExecutor
 import com.example.androidmcp.util.TokenStore
 import java.net.Inet4Address
 import java.net.NetworkInterface
@@ -117,8 +117,8 @@ class McpService : Service() {
         val token = TokenStore.getOrCreate(this)
         httpServer = HttpServer(PORT, router, authToken = token)
 
-        ShizukuHelper.checkStatus()
-        Log.i(TAG, "Shizuku available: ${ShizukuHelper.isAvailable}, granted: ${ShizukuHelper.isPermissionGranted}")
+        PrivilegeExecutor.checkStatus()
+        Log.i(TAG, "Privilege mode=${PrivilegeExecutor.getMode()}, backend=${PrivilegeExecutor.activeBackendName()}")
 
         httpServer?.start()
         val ip = getLocalIpAddress()

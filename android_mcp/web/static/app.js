@@ -12,7 +12,7 @@ var I = {
     shell:'Shell',home:'Home',back:'Back',recent:'Recent',power:'Power',
     volUp:'Vol+',volDown:'Vol-',enter:'Enter',delete:'Delete',
     model:'Model',android:'Android',display:'Display',battery:'Battery',
-    app:'App',shizuku:'Shizuku',liveScreen:'Live Screen',scrcpy:'scrcpy',save:'Save',
+    app:'App',shizuku:'Shizuku',privilegeMode:'Privilege Mode',modeAuto:'Auto',modeShizuku:'Shizuku',modeRoot:'Root',liveScreen:'Live Screen',scrcpy:'scrcpy',save:'Save',
     aiAssistant:'AI Phone Assistant',aiSub:'Control your Android device with natural language.',
     chips:['Take a screenshot','Open Settings','Press home','Battery level?','Click search','Read clipboard'],
     chatPlaceholder:'Describe what to do...',
@@ -33,7 +33,7 @@ var I = {
     shell:'\u547d\u4ee4',home:'\u4e3b\u9875',back:'\u8fd4\u56de',recent:'\u8fd1\u671f',power:'\u7535\u6e90',
     volUp:'\u97f3\u91cf+',volDown:'\u97f3\u91cf-',enter:'\u786e\u8ba4',delete:'\u5220\u9664',
     model:'\u578b\u53f7',android:'\u5b89\u5353',display:'\u5206\u8fa8\u7387',battery:'\u7535\u6c60',
-    app:'\u5e94\u7528',shizuku:'Shizuku',liveScreen:'\u5b9e\u65f6\u753b\u9762',scrcpy:'\u6295\u5c4f',save:'\u4fdd\u5b58',
+    app:'\u5e94\u7528',shizuku:'Shizuku',privilegeMode:'\u7279\u6743\u6a21\u5f0f',modeAuto:'\u81ea\u52a8',modeShizuku:'Shizuku',modeRoot:'Root',liveScreen:'\u5b9e\u65f6\u753b\u9762',scrcpy:'\u6295\u5c4f',save:'\u4fdd\u5b58',
     aiAssistant:'AI \u624b\u673a\u52a9\u624b',aiSub:'\u7528\u81ea\u7136\u8bed\u8a00\u63a7\u5236\u4f60\u7684 Android \u8bbe\u5907\u3002',
     chips:['\u622a\u56fe','\u6253\u5f00\u8bbe\u7f6e','\u6309\u4e3b\u9875','\u7535\u6c60\u7535\u91cf?','\u70b9\u51fb\u641c\u7d22','\u8bfb\u53d6\u526a\u8d34\u677f'],
     chatPlaceholder:'\u63cf\u8ff0\u4f60\u8981\u64cd\u4f5c\u7684\u5185\u5bb9...',
@@ -147,6 +147,7 @@ function setVal(id, val){
 function refreshStatus(){
   sendWS('health', {}, function(r){
     if(!r) return;
+    renderMode(r);
     var dot = document.getElementById('statusDot');
     var label = document.getElementById('statusLabel');
     if(r.connected){
@@ -161,6 +162,35 @@ function refreshStatus(){
   });
 }
 
+function renderMode(state){
+  var mode = (state && state.mode) || 'auto';
+  var backend = (state && state.backend) || '';
+  var root = !!(state && state.root);
+  var shizuku = !!(state && (state.shizuku_running || state.shizuku));
+  document.querySelectorAll('.mode-btn').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-mode') === mode);
+  });
+  var st = document.getElementById('modeStatus');
+  if(st){
+    if(state && state.connected === false){ st.textContent = 'device disconnected'; }
+    else if(backend === 'root'){ st.textContent = 'Root (su) active'; }
+    else if(backend === 'shizuku'){ st.textContent = 'Shizuku active'; }
+    else if(root || shizuku){ st.textContent = 'waiting for grant...'; }
+    else { st.textContent = 'no privilege backend'; }
+  }
+}
+
+function setMode(mode){
+  sendWS('set_mode', {mode:mode}, function(r){
+    if(r && r.success){
+      renderMode(r);
+      toast('Mode: ' + mode);
+      setTimeout(refreshStatus, 800);
+    } else {
+      toast('Failed: ' + ((r && r.error) || 'unknown'));
+    }
+  });
+}
 // ===== Quick Actions =====
 function quick(cmd, params){
   if(cmd === 'screenshot' || cmd === 'take_screenshot'){
@@ -562,9 +592,10 @@ function applyI18n(){
   // Section labels
   var labels = document.querySelectorAll('.section-label');
   if(labels[0]) labels[0].textContent = t('device');
-  if(labels[1]) labels[1].textContent = t('quickActions');
-  if(labels[2]) labels[2].textContent = t('shell');
-  if(labels[3]) labels[3].textContent = t('liveScreen');
+  if(labels[1]) labels[1].textContent = t('privilegeMode');
+  if(labels[2]) labels[2].textContent = t('quickActions');
+  if(labels[3]) labels[3].textContent = t('shell');
+  if(labels[4]) labels[4].textContent = t('liveScreen');
   // Device card labels
   var dc = document.querySelectorAll('.dc-label');
   var dkeys = ['model','android','display','battery','app','shizuku'];

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "android-mcp-server"
-version = "2.0.2"
+version = "2.1.0"
 description = "MCP Server for Android device automation via Shizuku + ADB tunnel"
 requires-python = ">=3.10"
 authors = [

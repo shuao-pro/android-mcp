@@ -78,6 +78,10 @@ class Router {
             "system.clipboard.get" -> systemApi.getClipboard()
             "system.clipboard.set" -> systemApi.setClipboard(params)
 
+            // Privilege mode (root / shizuku / auto)
+            "system.mode.get" -> systemApi.getMode()
+            "system.mode.set" -> systemApi.setMode(params)
+
             // System - Notifications
             "system.notification.list" -> systemApi.listNotifications()
             "system.notification.cancel" -> systemApi.cancelNotification(params)

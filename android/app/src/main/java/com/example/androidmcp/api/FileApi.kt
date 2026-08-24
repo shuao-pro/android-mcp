@@ -1,7 +1,7 @@
 package com.example.androidmcp.api
 
 import android.util.Base64
-import com.example.androidmcp.util.ShizukuHelper
+import com.example.androidmcp.util.PrivilegeExecutor
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -11,7 +11,7 @@ class FileApi {
         val path = params.optString("path", "")
         if (path.isEmpty()) throw IllegalArgumentException("path required")
 
-        val result = ShizukuHelper.exec("cat '$path'")
+        val result = PrivilegeExecutor.exec("cat '$path'")
 
         return JSONObject().apply {
             put("success", result.isSuccess)
@@ -45,11 +45,11 @@ class FileApi {
         // Write via base64 to avoid shell escaping issues
         val b64 = Base64.encodeToString(decodedBytes, Base64.NO_WRAP)
         val tmpPath = "/data/local/tmp/mcp_filewrite_${System.currentTimeMillis()}.tmp"
-        ShizukuHelper.exec("echo $b64 | base64 -d > $tmpPath 2>/dev/null")
+        PrivilegeExecutor.exec("echo $b64 | base64 -d > $tmpPath 2>/dev/null")
 
         val redirect = if (append) ">>" else ">"
-        val result = ShizukuHelper.exec("cat $tmpPath $redirect '$path'")
-        ShizukuHelper.exec("rm -f $tmpPath")
+        val result = PrivilegeExecutor.exec("cat $tmpPath $redirect '$path'")
+        PrivilegeExecutor.exec("rm -f $tmpPath")
 
         return JSONObject().apply {
             put("success", result.isSuccess)
@@ -63,7 +63,7 @@ class FileApi {
         val path = params.optString("path", "/sdcard")
         if (path.isEmpty()) throw IllegalArgumentException("path required")
 
-        val result = ShizukuHelper.exec("ls -la '$path'")
+        val result = PrivilegeExecutor.exec("ls -la '$path'")
 
         val files = JSONArray()
         result.stdout.lines().forEach { line ->
@@ -100,7 +100,7 @@ class FileApi {
         val path = params.optString("path", "")
         if (path.isEmpty()) throw IllegalArgumentException("path required")
 
-        val result = ShizukuHelper.exec("stat -c '%n|%s|%a|%U|%G|%Y|%F' '$path'")
+        val result = PrivilegeExecutor.exec("stat -c '%n|%s|%a|%U|%G|%Y|%F' '$path'")
 
         return if (result.isSuccess && result.stdout.isNotBlank()) {
             val parts = result.stdout.split("|")
@@ -133,7 +133,7 @@ class FileApi {
         }
 
         val cmd = if (recursive) "rm -rf '$path'" else "rm -f '$path'"
-        val result = ShizukuHelper.exec(cmd)
+        val result = PrivilegeExecutor.exec(cmd)
 
         return JSONObject().apply {
             put("success", result.isSuccess)

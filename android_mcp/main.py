@@ -1,4 +1,4 @@
-﻿"""Entry point for Android MCP Server.
+"""Entry point for Android MCP Server.
 
 Usage:
     python -m android_mcp.main                  # all-sse (SSE+Streamable HTTP+Web GUI, default)
@@ -49,7 +49,7 @@ def print_startup_banner(mode: str) -> None:
     bar = paint("=" * 60, DIM)
     print(bar)
     print(f"  {paint('Android MCP Server', BOLD)} {paint('v' + get_version(), DIM)}")
-    print(f"  {paint('Shizuku + ADB Tunnel', DIM)}")
+    print(f"  {paint('Root / Shizuku + ADB Tunnel', DIM)}")
     print(bar)
 
     if mode in ("mcp-sse", "all-sse"):

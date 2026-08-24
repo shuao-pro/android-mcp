@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Android MCP</title>
-<link rel="stylesheet" href="/static/style.css?v=3.4">
+<link rel="stylesheet" href="/static/style.css?v=3.5">
 </head>
 <body>
 <div id="app">
@@ -13,7 +13,7 @@
 <button class="mobile-toggle header-btn" onclick="togglePanel('left')" title="Device"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18.01"/></svg></button>
 <div class="header-logo">A</div>
 <span class="header-title">Android MCP</span>
-<span class="header-badge">v2.0</span>
+<span class="header-badge">v2.1</span>
 </div>
 <div class="header-right">
 <div class="status-indicator"><span class="status-pulse" id="statusDot"></span>
@@ -43,6 +43,13 @@
 <div class="device-card"><div class="dc-label">App</div><div class="dc-value" id="devApp">--</div></div>
 <div class="device-card"><div class="dc-label">Shizuku</div><div class="dc-value" id="devShizuku">--</div></div>
 </div>
+<div class="section-label">Privilege Mode</div>
+<div class="mode-selector" id="modeSelector">
+<button class="mode-btn" data-mode="auto" data-i18n="modeAuto" onclick="setMode('auto')">Auto</button>
+<button class="mode-btn" data-mode="shizuku" data-i18n="modeShizuku" onclick="setMode('shizuku')">Shizuku</button>
+<button class="mode-btn" data-mode="root" data-i18n="modeRoot" onclick="setMode('root')">Root</button>
+</div>
+<div class="mode-status" id="modeStatus">--</div>
 <div class="section-label">Quick Actions</div>
 <div class="quick-actions">
 <button class="qa-btn" onclick="quick('press_key',{key:'home'})"><span class="qa-icon">&#8962;</span>Home</button>
@@ -155,6 +162,6 @@
 <div class="modal-foot"><span id="setupSummary" style="font-size:13px;font-weight:600"></span>
 <span><button class="btn btn-sm" onclick="checkSetup()">Check All</button>
 <button class="btn btn-primary btn-sm" onclick="closeSetup()">Done</button></span></div></div></div>
-<script src="/static/app.js?v=3.5"></script>
+<script src="/static/app.js?v=3.6"></script>
 </body>
 </html>

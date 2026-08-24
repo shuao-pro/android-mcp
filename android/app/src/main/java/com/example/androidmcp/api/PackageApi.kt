@@ -1,6 +1,6 @@
 package com.example.androidmcp.api
 
-import com.example.androidmcp.util.ShizukuHelper
+import com.example.androidmcp.util.PrivilegeExecutor
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -17,7 +17,7 @@ class PackageApi {
             append(" -r '$apkPath'")
         }
 
-        val result = ShizukuHelper.exec(cmd)
+        val result = PrivilegeExecutor.exec(cmd)
         return JSONObject().apply {
             put("success", result.isSuccess)
             put("stdout", result.stdout)
@@ -36,7 +36,7 @@ class PackageApi {
             append(" $packageName")
         }
 
-        val result = ShizukuHelper.exec(cmd)
+        val result = PrivilegeExecutor.exec(cmd)
         return JSONObject().apply {
             put("success", result.isSuccess)
             put("stdout", result.stdout)
@@ -49,10 +49,10 @@ class PackageApi {
         val activity = params.optString("activity", "")
 
         val cmd = if (activity.isNotEmpty()) {
-            val result = ShizukuHelper.exec("am start -n $packageName/$activity")
+            val result = PrivilegeExecutor.exec("am start -n $packageName/$activity")
             result
         } else {
-            val result = ShizukuHelper.exec("monkey -p $packageName -c android.intent.category.LAUNCHER 1")
+            val result = PrivilegeExecutor.exec("monkey -p $packageName -c android.intent.category.LAUNCHER 1")
             result
         }
 
@@ -67,7 +67,7 @@ class PackageApi {
         val packageName = params.optString("package", "")
         if (packageName.isEmpty()) throw IllegalArgumentException("package required")
 
-        val result = ShizukuHelper.exec("am force-stop $packageName")
+        val result = PrivilegeExecutor.exec("am force-stop $packageName")
         return JSONObject().apply {
             put("success", result.isSuccess)
             put("stdout", result.stdout)
@@ -79,7 +79,7 @@ class PackageApi {
         val packageName = params.optString("package", "")
         if (packageName.isEmpty()) throw IllegalArgumentException("package required")
 
-        val result = ShizukuHelper.exec("pm clear $packageName")
+        val result = PrivilegeExecutor.exec("pm clear $packageName")
         return JSONObject().apply {
             put("success", result.isSuccess)
             put("stdout", result.stdout)
@@ -92,7 +92,7 @@ class PackageApi {
         val includeSystem = params.optBoolean("include_system", false)
 
         val cmd = if (includeSystem) "pm list packages" else "pm list packages -3"
-        val result = ShizukuHelper.exec(cmd)
+        val result = PrivilegeExecutor.exec(cmd)
 
         val packages = JSONArray()
         result.stdout.lines().forEach { line ->

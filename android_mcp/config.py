@@ -1,4 +1,4 @@
-﻿import os
+import os
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -14,6 +14,11 @@ class Config:
 
     # Request timeout (seconds)
     REQUEST_TIMEOUT: float = float(os.getenv("REQUEST_TIMEOUT", "30.0"))
+
+    # Safety guard for high-risk device operations.
+    # permissive = allow everything; confirm = require user approval (default);
+    # strict = block high/medium-risk operations.
+    SAFETY_MODE: str = os.getenv("SAFETY_MODE", "confirm")
 
     # Web GUI
     WEB_HOST: str = os.getenv("WEB_HOST", "127.0.0.1")
@@ -49,6 +54,13 @@ class Config:
         if self.REQUEST_TIMEOUT <= 0:
             warnings.append(
                 f"REQUEST_TIMEOUT={self.REQUEST_TIMEOUT} must be positive"
+            )
+
+        valid_safety_modes = ("permissive", "confirm", "strict")
+        if self.SAFETY_MODE.strip().lower() not in valid_safety_modes:
+            warnings.append(
+                f"SAFETY_MODE={self.SAFETY_MODE!r} is invalid. "
+                f"Use: permissive, confirm, or strict"
             )
 
         valid_providers = ("anthropic", "openai", "custom")
